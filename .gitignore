@@ -1,0 +1,7 @@
+.gocache/
+node_modules/
+dist/
+tools/
+*.log
+web/.next/
+web/node_modules/
