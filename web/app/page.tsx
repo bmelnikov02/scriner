@@ -175,6 +175,9 @@ function buildFallbackRows(symbols: string[]) {
 }
 
 function getApiUrl(path: string) {
+  const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL?.replace(/\/$/, "");
+
+  if (backendUrl) return `${backendUrl}${path}`;
   if (typeof window === "undefined") return `http://localhost:${API_PORT}${path}`;
 
   const { hostname } = window.location;
@@ -187,6 +190,14 @@ function getApiUrl(path: string) {
 }
 
 function getWsUrl(path: string) {
+  const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL?.replace(/\/$/, "");
+
+  if (backendUrl) {
+    const wsBackendUrl = backendUrl.replace(/^https:/, "wss:").replace(/^http:/, "ws:");
+
+    return `${wsBackendUrl}${path}`;
+  }
+
   if (typeof window === "undefined") return `ws://localhost:${API_PORT}${path}`;
 
   const { hostname, host, protocol } = window.location;

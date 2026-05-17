@@ -3,6 +3,7 @@ package main
 import (
 	"log"
 	"net/http"
+	"os"
 
 	"screiner-backend/binance"
 	"screiner-backend/handlers"
@@ -41,6 +42,11 @@ func main() {
 	http.HandleFunc("/candles", handlers.Candles)
 	http.HandleFunc("/ws", wsHandler)
 
-	log.Println("Backend started on :4000")
-	http.ListenAndServe(":4000", nil)
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "4000"
+	}
+
+	log.Println("Backend started on :" + port)
+	http.ListenAndServe(":"+port, nil)
 }
