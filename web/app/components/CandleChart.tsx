@@ -357,6 +357,10 @@ export default function CandleChart({
   const draftDrawingRef = useRef<Drawing | null>(null);
   const toolsEnabledRef = useRef(false);
   const trajectoryLastPointRef = useRef<DrawingPoint | null>(null);
+  const olderCandlesRequestRef = useRef<{
+    oldestTime: number;
+    requestedAt: number;
+  } | null>(null);
   const [drawingPlugin] = useState(() => ({
     id: "drawing-overlay",
     afterDatasetsDraw(chart: ChartJS) {
@@ -800,8 +804,8 @@ export default function CandleChart({
     },
   } as Record<string, unknown>;
 
-  useEffect(() => {
-    if (!onNeedOlderCandles || !currentXRange || candles.length < 2) return;
+  function requestOlderCandlesIfNeeded(leftEdgeTime: number) {
+    if (!onNeedOlderCandles || candles.length < 2) return;
 
     const oldestTime = candles[0].x;
     const newestTime = candles[candles.length - 1].x;
@@ -809,12 +813,37 @@ export default function CandleChart({
 
     if (loadedRange <= 0) return;
 
-    const nearLeftEdge = currentXRange.min <= oldestTime + loadedRange * 0.22;
+    const nearLeftEdge = leftEdgeTime <= oldestTime + loadedRange * 0.25;
 
-    if (nearLeftEdge) {
-      onNeedOlderCandles(oldestTime);
+    if (!nearLeftEdge) return;
+
+    const now = Date.now();
+    const lastRequest = olderCandlesRequestRef.current;
+
+    if (
+      lastRequest &&
+      lastRequest.oldestTime === oldestTime &&
+      now - lastRequest.requestedAt < 30_000
+    ) {
+      return;
     }
-  }, [candles, currentXRange, onNeedOlderCandles]);
+
+    if (lastRequest && now - lastRequest.requestedAt < 1_500) {
+      return;
+    }
+
+    olderCandlesRequestRef.current = {
+      oldestTime,
+      requestedAt: now,
+    };
+    onNeedOlderCandles(oldestTime);
+  }
+
+  useEffect(() => {
+    if (!currentXRange) return;
+
+    requestOlderCandlesIfNeeded(currentXRange.min);
+  }, [candles, currentXRange]);
 
   function redrawChart() {
     window.requestAnimationFrame(() => chartRef.current?.draw());
@@ -921,16 +950,7 @@ export default function CandleChart({
       };
     });
 
-    if (candles.length > 1 && onNeedOlderCandles) {
-      const oldestTime = candles[0].x;
-      const newestTime = candles[candles.length - 1].x;
-      const loadedRange = newestTime - oldestTime;
-      const nearLeftEdge = loadedRange > 0 && xScale.min <= oldestTime + loadedRange * 0.18;
-
-      if (nearLeftEdge) {
-        onNeedOlderCandles(oldestTime);
-      }
-    }
+    requestOlderCandlesIfNeeded(xScale.min);
 
     redrawChart();
   }

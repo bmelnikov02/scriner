@@ -6,7 +6,22 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
+	"sync"
+	"time"
 )
+
+type candleCacheItem struct {
+	body      []byte
+	expiresAt time.Time
+}
+
+var candleCache = struct {
+	sync.Mutex
+	items map[string]candleCacheItem
+}{
+	items: map[string]candleCacheItem{},
+}
 
 func Candles(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Access-Control-Allow-Origin", "*")
@@ -49,6 +64,18 @@ func Candles(w http.ResponseWriter, r *http.Request) {
 		query.Set("endTime", endTime)
 	}
 
+	cacheKey := query.Encode()
+
+	candleCache.Lock()
+	cached, hasCached := candleCache.items[cacheKey]
+	candleCache.Unlock()
+
+	if hasCached && time.Now().Before(cached.expiresAt) {
+		w.Header().Set("Content-Type", "application/json")
+		w.Write(cached.body)
+		return
+	}
+
 	url := fmt.Sprintf(
 		"https://fapi.binance.com/fapi/v1/klines?%s",
 		query.Encode(),
@@ -65,6 +92,26 @@ func Candles(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		http.Error(w, "failed to read candles", http.StatusInternalServerError)
 		return
+	}
+
+	if resp.StatusCode >= 400 {
+		http.Error(w, string(body), resp.StatusCode)
+		return
+	}
+
+	if !strings.HasPrefix(strings.TrimSpace(string(body)), `{"code":`) {
+		cacheDuration := 20 * time.Second
+
+		if query.Get("endTime") != "" {
+			cacheDuration = 30 * time.Minute
+		}
+
+		candleCache.Lock()
+		candleCache.items[cacheKey] = candleCacheItem{
+			body:      body,
+			expiresAt: time.Now().Add(cacheDuration),
+		}
+		candleCache.Unlock()
 	}
 
 	w.Header().Set("Content-Type", "application/json")
