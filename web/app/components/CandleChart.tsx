@@ -845,6 +845,25 @@ export default function CandleChart({
     requestOlderCandlesIfNeeded(currentXRange.min);
   }, [candles, currentXRange]);
 
+  useEffect(() => {
+    if (!currentXRange || candles.length < 2) return;
+
+    const oldestTime = candles[0].x;
+    const newestTime = candles[candles.length - 1].x;
+    const visibleRange = currentXRange.max - currentXRange.min;
+    const loadedRange = newestTime - oldestTime;
+    const candlesAreMostlyOffscreen =
+      visibleRange > 0 &&
+      loadedRange > 0 &&
+      (currentXRange.max < oldestTime ||
+        currentXRange.min > newestTime ||
+        newestTime - currentXRange.min > loadedRange * 3);
+
+    if (candlesAreMostlyOffscreen) {
+      setXRange(null);
+    }
+  }, [candles, currentXRange]);
+
   function redrawChart() {
     window.requestAnimationFrame(() => chartRef.current?.draw());
   }
