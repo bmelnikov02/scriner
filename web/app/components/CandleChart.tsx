@@ -791,6 +791,14 @@ export default function CandleChart({
     1,
     ...volumeCandles.map((candle) => Number(candle.v ?? 0))
   );
+  const oldestCandleTime = candles[0]?.x;
+  const newestCandleTime = candles.at(-1)?.x;
+  const loadedXRange =
+    oldestCandleTime !== undefined &&
+    newestCandleTime !== undefined &&
+    newestCandleTime > oldestCandleTime
+      ? newestCandleTime - oldestCandleTime
+      : 0;
   const candleColors = {
     backgroundColors: {
       up: CANDLE_UP_COLOR,
@@ -839,6 +847,56 @@ export default function CandleChart({
     onNeedOlderCandles(oldestTime);
   }
 
+  function clampXRangeToCandles(range: XRange): XRange | null {
+    if (
+      oldestCandleTime === undefined ||
+      newestCandleTime === undefined ||
+      loadedXRange <= 0
+    ) {
+      return null;
+    }
+
+    const visibleRange = range.max - range.min;
+
+    if (!Number.isFinite(visibleRange) || visibleRange <= 0) return null;
+
+    if (visibleRange >= loadedXRange) {
+      return {
+        symbol,
+        timeframe,
+        min: oldestCandleTime,
+        max: newestCandleTime,
+      };
+    }
+
+    const hasCandlesInView =
+      range.max >= oldestCandleTime && range.min <= newestCandleTime;
+    const emptyLeft = Math.max(0, oldestCandleTime - range.min);
+    const emptyRight = Math.max(0, range.max - newestCandleTime);
+    const tooMuchEmptySpace =
+      !hasCandlesInView ||
+      emptyLeft > visibleRange * 0.08 ||
+      emptyRight > visibleRange * 0.08;
+
+    if (!tooMuchEmptySpace) return null;
+
+    if (range.max < oldestCandleTime || emptyLeft > 0) {
+      return {
+        symbol,
+        timeframe,
+        min: oldestCandleTime,
+        max: oldestCandleTime + visibleRange,
+      };
+    }
+
+    return {
+      symbol,
+      timeframe,
+      min: newestCandleTime - visibleRange,
+      max: newestCandleTime,
+    };
+  }
+
   useEffect(() => {
     if (!currentXRange) return;
 
@@ -848,21 +906,19 @@ export default function CandleChart({
   useEffect(() => {
     if (!currentXRange || candles.length < 2) return;
 
-    const oldestTime = candles[0].x;
-    const newestTime = candles[candles.length - 1].x;
-    const visibleRange = currentXRange.max - currentXRange.min;
-    const loadedRange = newestTime - oldestTime;
-    const candlesAreMostlyOffscreen =
-      visibleRange > 0 &&
-      loadedRange > 0 &&
-      (currentXRange.max < oldestTime ||
-        currentXRange.min > newestTime ||
-        newestTime - currentXRange.min > loadedRange * 3);
+    const fixedRange = clampXRangeToCandles(currentXRange);
 
-    if (candlesAreMostlyOffscreen) {
-      setXRange(null);
+    if (
+      fixedRange &&
+      (fixedRange.min !== currentXRange.min || fixedRange.max !== currentXRange.max)
+    ) {
+      setXRange(fixedRange);
+      window.requestAnimationFrame(() => {
+        chartRef.current?.update("none");
+        chartRef.current?.draw();
+      });
     }
-  }, [candles, currentXRange]);
+  }, [candles, currentXRange, loadedXRange, oldestCandleTime, newestCandleTime]);
 
   function redrawChart() {
     window.requestAnimationFrame(() => chartRef.current?.draw());
@@ -1494,6 +1550,17 @@ export default function CandleChart({
               intersect: false,
             },
             zoom: {
+              limits: {
+                x:
+                  oldestCandleTime !== undefined &&
+                  newestCandleTime !== undefined &&
+                  newestCandleTime > oldestCandleTime
+                    ? {
+                        min: oldestCandleTime,
+                        max: newestCandleTime,
+                      }
+                    : undefined,
+              },
               pan: {
                 enabled: true,
                 mode: "xy",
