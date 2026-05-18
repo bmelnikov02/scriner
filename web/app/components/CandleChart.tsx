@@ -748,7 +748,7 @@ export default function CandleChart({
   const [xRange, setXRange] = useState<XRange | null>(null);
   const [yRange, setYRange] = useState<YRange | null>(null);
   const [drawingTool, setDrawingTool] = useState<DrawingTool>("cursor");
-  const [activeToolPanel, setActiveToolPanel] = useState<"tf" | "draw" | null>("draw");
+  const [activeToolPanel, setActiveToolPanel] = useState<"tf" | "draw" | null>(null);
   const [drawingWindowStart, setDrawingWindowStart] = useState(0);
   const [localDrawings, setLocalDrawings] = useState<Drawing[]>([]);
   const [draftDrawing, setDraftDrawing] = useState<Drawing | null>(null);
