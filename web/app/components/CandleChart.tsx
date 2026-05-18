@@ -799,6 +799,23 @@ export default function CandleChart({
       unchanged: CANDLE_UNCHANGED_COLOR,
     },
   } as Record<string, unknown>;
+
+  useEffect(() => {
+    if (!onNeedOlderCandles || !currentXRange || candles.length < 2) return;
+
+    const oldestTime = candles[0].x;
+    const newestTime = candles[candles.length - 1].x;
+    const loadedRange = newestTime - oldestTime;
+
+    if (loadedRange <= 0) return;
+
+    const nearLeftEdge = currentXRange.min <= oldestTime + loadedRange * 0.22;
+
+    if (nearLeftEdge) {
+      onNeedOlderCandles(oldestTime);
+    }
+  }, [candles, currentXRange, onNeedOlderCandles]);
+
   function redrawChart() {
     window.requestAnimationFrame(() => chartRef.current?.draw());
   }
