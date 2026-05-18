@@ -77,6 +77,9 @@ const API_PORT = "4000";
 const WORKSPACE_STORAGE_KEY = "scriner-workspace-v1";
 const MOVE_ALERT_PERCENT = 1.5;
 const ALERT_COOLDOWN_MS = 45_000;
+const GRID_CANDLE_LIMIT = 500;
+const FULLSCREEN_CANDLE_LIMIT = 1000;
+const OLDER_CANDLE_LIMIT = 500;
 const BOOKMARK_COLORS = [
   "#2f80ed",
   "#c8b6dc",
@@ -129,6 +132,33 @@ function normalizeCandle(candle: {
     c: Number(candle.c),
     v: Number(candle.v ?? 0),
   };
+}
+
+function parseKlineCandles(data: unknown): Candle[] {
+  if (!Array.isArray(data)) return [];
+
+  return data.map((item) => {
+    const values = item as [number, string, string, string, string, string];
+
+    return {
+      x: values[0],
+      o: Number(values[1]),
+      h: Number(values[2]),
+      l: Number(values[3]),
+      c: Number(values[4]),
+      v: Number(values[5] ?? 0),
+    };
+  });
+}
+
+function mergeCandles(current: Candle[], incoming: Candle[]) {
+  const byTime = new Map<number, Candle>();
+
+  [...current, ...incoming].forEach((candle) => {
+    byTime.set(candle.x, candle);
+  });
+
+  return [...byTime.values()].sort((a, b) => a.x - b.x);
 }
 
 function formatPrice(value?: number) {
@@ -272,6 +302,7 @@ export default function Home() {
   const audioContextRef = useRef<AudioContext | null>(null);
   const drawingsByChartRef = useRef<DrawingsByChart>({});
   const quickSearchTimerRef = useRef<number | null>(null);
+  const olderCandlesLoadingRef = useRef<Set<string>>(new Set());
 
   const favoriteSet = useMemo(() => new Set(favorites), [favorites]);
 
@@ -627,7 +658,7 @@ export default function Home() {
 
             return {
               ...prev,
-              [symbol]: updated.slice(-1500),
+              [symbol]: updated.slice(-5000),
             };
           });
         }
@@ -647,10 +678,14 @@ export default function Home() {
   }, [checkPriceAlerts, timeframe]);
 
   useEffect(() => {
-    async function loadCandles(symbol: string, interval = timeframe) {
+    async function loadCandles(
+      symbol: string,
+      interval = timeframe,
+      limit = GRID_CANDLE_LIMIT
+    ) {
       try {
         const res = await fetch(
-          getApiUrl(`/candles?symbol=${symbol}&interval=${interval}`)
+          getApiUrl(`/candles?symbol=${symbol}&interval=${interval}&limit=${limit}`)
         );
 
         if (!res.ok) {
@@ -658,27 +693,14 @@ export default function Home() {
           return;
         }
 
-        const data: unknown = await res.json();
+        const formatted = parseKlineCandles(await res.json());
 
-        if (!Array.isArray(data)) return;
-
-        const formatted: Candle[] = data.map((item) => {
-          const values = item as [number, string, string, string, string, string];
-
-          return {
-            x: values[0],
-            o: Number(values[1]),
-            h: Number(values[2]),
-            l: Number(values[3]),
-            c: Number(values[4]),
-            v: Number(values[5] ?? 0),
-          };
-        });
+        if (formatted.length === 0) return;
 
         if (interval === timeframe) {
           setCandles((prev) => ({
             ...prev,
-            [symbol]: formatted,
+            [symbol]: mergeCandles(prev[symbol] ?? [], formatted).slice(-5000),
           }));
         }
       } catch (error) {
@@ -692,14 +714,14 @@ export default function Home() {
       for (const symbol of visibleSymbols) {
         if (cancelled) return;
 
-        await loadCandles(symbol);
+        await loadCandles(symbol, timeframe, GRID_CANDLE_LIMIT);
       }
     }
 
     void loadVisibleCandles();
 
     if (fullscreenSymbol) {
-      loadCandles(fullscreenSymbol);
+      loadCandles(fullscreenSymbol, timeframe, FULLSCREEN_CANDLE_LIMIT);
     }
 
     return () => {
@@ -904,6 +926,42 @@ export default function Home() {
       await navigator.clipboard.writeText(symbol);
     } catch (error) {
       console.error("Copy symbol error:", error);
+    }
+  }
+
+  async function loadOlderCandles(symbol: string, oldestTime: number) {
+    const requestKey = `${symbol}:${timeframe}:${oldestTime}`;
+
+    if (olderCandlesLoadingRef.current.has(requestKey)) return;
+
+    olderCandlesLoadingRef.current.add(requestKey);
+
+    try {
+      const res = await fetch(
+        getApiUrl(
+          `/candles?symbol=${symbol}&interval=${timeframe}&limit=${OLDER_CANDLE_LIMIT}&endTime=${
+            oldestTime - 1
+          }`
+        )
+      );
+
+      if (!res.ok) {
+        console.error("Older candles error:", await res.text());
+        return;
+      }
+
+      const olderCandles = parseKlineCandles(await res.json());
+
+      if (olderCandles.length === 0) return;
+
+      setCandles((prev) => ({
+        ...prev,
+        [symbol]: mergeCandles(prev[symbol] ?? [], olderCandles).slice(-5000),
+      }));
+    } catch (error) {
+      console.error("Load older candles error:", error);
+    } finally {
+      olderCandlesLoadingRef.current.delete(requestKey);
     }
   }
 
@@ -1449,6 +1507,9 @@ export default function Home() {
                       heightClass={chartHeight}
                       compact
                       drawings={drawingsByChart[drawingKey] ?? []}
+                      onNeedOlderCandles={(oldestTime) =>
+                        void loadOlderCandles(symbol, oldestTime)
+                      }
                     />
                   </div>
 
@@ -1705,6 +1766,9 @@ export default function Home() {
               }
               onDrawingsChange={(nextDrawings) =>
                 updateChartDrawings(fullscreenSymbol, nextDrawings)
+              }
+              onNeedOlderCandles={(oldestTime) =>
+                void loadOlderCandles(fullscreenSymbol, oldestTime)
               }
             />
           </div>

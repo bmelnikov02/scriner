@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
+	"strconv"
 )
 
 func Candles(w http.ResponseWriter, r *http.Request) {
@@ -26,10 +28,30 @@ func Candles(w http.ResponseWriter, r *http.Request) {
 		interval = "1m"
 	}
 
+	limit := r.URL.Query().Get("limit")
+	if limit == "" {
+		limit = "500"
+	}
+
+	limitValue, err := strconv.Atoi(limit)
+	if err != nil || limitValue < 1 {
+		limit = "500"
+	} else if limitValue > 1500 {
+		limit = "1500"
+	}
+
+	query := url.Values{}
+	query.Set("symbol", symbol)
+	query.Set("interval", interval)
+	query.Set("limit", limit)
+
+	if endTime := r.URL.Query().Get("endTime"); endTime != "" {
+		query.Set("endTime", endTime)
+	}
+
 	url := fmt.Sprintf(
-		"https://fapi.binance.com/fapi/v1/klines?symbol=%s&interval=%s&limit=1500",
-		symbol,
-		interval,
+		"https://fapi.binance.com/fapi/v1/klines?%s",
+		query.Encode(),
 	)
 
 	resp, err := http.Get(url)

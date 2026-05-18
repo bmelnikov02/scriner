@@ -52,6 +52,7 @@ type Props = {
   };
   drawings?: Drawing[];
   onDrawingsChange?: (drawings: Drawing[]) => void;
+  onNeedOlderCandles?: (oldestTime: number) => void;
 };
 
 type XRange = {
@@ -345,6 +346,7 @@ export default function CandleChart({
   timeframeControls,
   drawings: controlledDrawings,
   onDrawingsChange,
+  onNeedOlderCandles,
 }: Props) {
   const chartRef = useRef<ChartJS | null>(null);
   const yScaleDragRef = useRef<YScaleDrag | null>(null);
@@ -901,6 +903,18 @@ export default function CandleChart({
         max: yScale.max,
       };
     });
+
+    if (candles.length > 1 && onNeedOlderCandles) {
+      const oldestTime = candles[0].x;
+      const newestTime = candles[candles.length - 1].x;
+      const loadedRange = newestTime - oldestTime;
+      const nearLeftEdge = loadedRange > 0 && xScale.min <= oldestTime + loadedRange * 0.18;
+
+      if (nearLeftEdge) {
+        onNeedOlderCandles(oldestTime);
+      }
+    }
+
     redrawChart();
   }
 
