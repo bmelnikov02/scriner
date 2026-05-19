@@ -68,8 +68,8 @@ type WsMessage =
 const GRID_COUNTS = Array.from({ length: 12 }, (_, index) => index + 1);
 const GRID_WINDOW_SIZE = 6;
 const DEFAULT_GRID_WINDOW_START = 3;
-const TIMEFRAMES = ["1s", "1m", "5m", "15m", "1h", "4h", "1d", "1w", "1M"];
-const TIMEFRAME_WINDOW_SIZE = 5;
+const TIMEFRAMES = ["1m", "5m", "15m", "1h", "4h", "1d", "1w", "1M"];
+const TIMEFRAME_WINDOW_SIZE = TIMEFRAMES.length;
 const DEFAULT_TIMEFRAME_WINDOW_START = 2;
 const MULTI_TIMEFRAMES = ["5m", "15m", "1h", "4h"];
 const API_PORT = "4000";
@@ -355,14 +355,7 @@ export default function Home() {
     );
   }, [orderedSymbols, quickSearchValue]);
 
-  const visibleTimeframes = useMemo(
-    () =>
-      TIMEFRAMES.slice(
-        timeframeWindowStart,
-        timeframeWindowStart + TIMEFRAME_WINDOW_SIZE
-      ),
-    [timeframeWindowStart]
-  );
+  const visibleTimeframes = TIMEFRAMES;
 
   const visibleGridCounts = useMemo(
     () => GRID_COUNTS.slice(gridWindowStart, gridWindowStart + GRID_WINDOW_SIZE),
@@ -1223,21 +1216,12 @@ export default function Home() {
             </div>
 
             {timeframeOpen && (
-              <div className="mx-auto grid w-full max-w-[420px] grid-cols-[30px_repeat(5,minmax(0,1fr))_30px] overflow-hidden rounded-md border border-white/10 bg-black/20 text-center">
-                <button
-                  type="button"
-                  onClick={() => shiftTimeframeWindow(-1)}
-                  disabled={timeframeWindowStart === 0}
-                  className="border-r border-white/10 px-1.5 py-1 text-base font-black text-[#c8b6dc] transition hover:bg-[#c8b6dc]/10 disabled:text-white/20 disabled:hover:bg-transparent"
-                  aria-label="Shift timeframes left"
-                >
-                  {"<"}
-                </button>
+              <div className="mx-auto grid w-full max-w-[360px] grid-cols-8 overflow-hidden rounded-md border border-white/10 bg-black/20 text-center">
                 {visibleTimeframes.map((item) => (
                   <button
                     key={item}
                     onClick={() => changeTimeframe(item)}
-                    className={`border-r border-white/10 px-1.5 py-1 text-[11px] font-semibold transition ${
+                    className={`border-r border-white/10 px-1 py-0.5 text-[10px] font-semibold transition last:border-r-0 ${
                       timeframe === item
                         ? "bg-[#c8b6dc] text-black"
                         : "text-white/70 hover:bg-white/[0.06] hover:text-white"
@@ -1246,18 +1230,6 @@ export default function Home() {
                     {item}
                   </button>
                 ))}
-                <button
-                  type="button"
-                  onClick={() => shiftTimeframeWindow(1)}
-                  disabled={
-                    timeframeWindowStart >=
-                    TIMEFRAMES.length - TIMEFRAME_WINDOW_SIZE
-                  }
-                  className="px-1.5 py-1 text-base font-black text-[#c8b6dc] transition hover:bg-[#c8b6dc]/10 disabled:text-white/20 disabled:hover:bg-transparent"
-                  aria-label="Shift timeframes right"
-                >
-                  {">"}
-                </button>
               </div>
             )}
 

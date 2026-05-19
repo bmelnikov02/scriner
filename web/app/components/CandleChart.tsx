@@ -1561,21 +1561,13 @@ export default function CandleChart({
           </div>
 
           {activeToolPanel === "tf" && timeframeControls && (
-            <div className="grid grid-cols-[32px_repeat(5,minmax(0,1fr))_32px] border-b border-white/10 text-[11px] font-semibold">
-              <button
-                type="button"
-                onClick={() => timeframeControls.onShift(-1)}
-                disabled={!timeframeControls.canShiftLeft}
-                className="h-8 border-r border-white/10 text-base font-black text-[#c8b6dc] transition hover:bg-[#c8b6dc]/10 disabled:text-white/20 disabled:hover:bg-transparent"
-              >
-                {"<"}
-              </button>
+            <div className="grid grid-cols-8 border-b border-white/10 text-[10px] font-semibold">
               {timeframeControls.visible.map((item) => (
                 <button
                   key={item}
                   type="button"
                   onClick={() => timeframeControls.onChange(item)}
-                  className={`h-8 border-r border-white/10 transition ${
+                  className={`h-6 border-r border-white/10 transition last:border-r-0 ${
                     timeframeControls.active === item
                       ? "bg-[#c8b6dc] text-black"
                       : "text-white/70 hover:bg-white/[0.06] hover:text-white"
@@ -1584,14 +1576,6 @@ export default function CandleChart({
                   {item}
                 </button>
               ))}
-              <button
-                type="button"
-                onClick={() => timeframeControls.onShift(1)}
-                disabled={!timeframeControls.canShiftRight}
-                className="h-8 text-base font-black text-[#c8b6dc] transition hover:bg-[#c8b6dc]/10 disabled:text-white/20 disabled:hover:bg-transparent"
-              >
-                {">"}
-              </button>
             </div>
           )}
 
