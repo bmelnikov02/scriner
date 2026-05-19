@@ -35,15 +35,12 @@ type Candle = {
   v?: number;
 };
 
-type ThemeMode = "dark" | "light";
-
 type Props = {
   symbol: string;
   candles: Candle[];
   heightClass?: string;
   timeframe?: string;
   compact?: boolean;
-  themeMode?: ThemeMode;
   showTools?: boolean;
   timeframeControls?: {
     active: string;
@@ -405,7 +402,6 @@ export default function CandleChart({
   heightClass = "h-[300px]",
   timeframe = "1m",
   compact = false,
-  themeMode = "dark",
   showTools = false,
   timeframeControls,
   drawings: controlledDrawings,
@@ -906,7 +902,6 @@ export default function CandleChart({
   const [localDrawings, setLocalDrawings] = useState<Drawing[]>([]);
   const [draftDrawing, setDraftDrawing] = useState<Drawing | null>(null);
   const [shiftPressed, setShiftPressed] = useState(false);
-  const isLightTheme = themeMode === "light";
   const drawings = controlledDrawings ?? localDrawings;
   const lastCandle = candles.at(-1);
   const lows = candles.map((candle) => candle.l);
@@ -970,23 +965,6 @@ export default function CandleChart({
       unchanged: CANDLE_UNCHANGED_COLOR,
     },
   } as Record<string, unknown>;
-  const chartTheme = {
-    background: isLightTheme ? "#f4f0fb" : CHART_BACKGROUND_COLOR,
-    volumeBackground: isLightTheme ? "#f4f0fb" : CHART_BACKGROUND_COLOR,
-    grid: isLightTheme ? "rgba(62,48,78,0.12)" : CHART_GRID_COLOR,
-    border: isLightTheme
-      ? "rgba(62,48,78,0.2)"
-      : CHART_GRID_STRONG_COLOR,
-    tick: isLightTheme ? "#746985" : "#8b949e",
-    xTick: isLightTheme ? "#7c718d" : "#6f7681",
-    legend: isLightTheme ? "#62576f" : "#8b949e",
-    tooltipBackground: isLightTheme
-      ? "rgba(250,247,255,0.96)"
-      : "rgba(17,17,22,0.94)",
-    tooltipTitle: isLightTheme ? "#21182e" : "#ffffff",
-    tooltipBody: isLightTheme ? "#4b4258" : "#d1d5db",
-    volumeLabel: isLightTheme ? "#746985" : "#8b949e",
-  };
 
   function requestOlderCandlesIfNeeded(leftEdgeTime: number) {
     if (!onNeedOlderCandles || candles.length < 2) return;
@@ -1521,7 +1499,7 @@ export default function CandleChart({
   return (
     <div
       className={`relative flex h-full min-h-0 flex-col overflow-hidden ${heightClass}`}
-      style={{ backgroundColor: chartTheme.background }}
+      style={{ backgroundColor: CHART_BACKGROUND_COLOR }}
       onPointerMove={updateCursorPrice}
       onPointerLeave={clearCursorPrice}
     >
@@ -1697,16 +1675,16 @@ export default function CandleChart({
               ticks: {
                 autoSkip: true,
                 maxTicksLimit,
-                color: chartTheme.xTick,
+                color: "#6f7681",
                 font: {
                   size: compact ? 9 : 10,
                 },
               },
               grid: {
-                color: chartTheme.grid,
+                color: CHART_GRID_COLOR,
               },
               border: {
-                color: chartTheme.border,
+                color: CHART_GRID_STRONG_COLOR,
               },
             },
             y: {
@@ -1714,7 +1692,7 @@ export default function CandleChart({
               min: currentYRange?.min ?? (candles.length ? autoYMin : undefined),
               max: currentYRange?.max ?? (candles.length ? autoYMax : undefined),
               ticks: {
-                color: chartTheme.tick,
+                color: "#8b949e",
                 maxTicksLimit,
                 stepSize: currentYRange ? undefined : yStep,
                 callback: (value) => formatAxisPrice(Number(value), yStep),
@@ -1723,10 +1701,10 @@ export default function CandleChart({
                 },
               },
               grid: {
-                color: chartTheme.grid,
+                color: CHART_GRID_COLOR,
               },
               border: {
-                color: chartTheme.border,
+                color: CHART_GRID_STRONG_COLOR,
               },
             },
           },
@@ -1735,7 +1713,7 @@ export default function CandleChart({
               display: !compact,
               position: "top",
               labels: {
-                color: chartTheme.legend,
+                color: "#8b949e",
                 boxWidth: 10,
                 boxHeight: 10,
                 font: {
@@ -1745,9 +1723,9 @@ export default function CandleChart({
             },
             tooltip: {
               enabled: true,
-              backgroundColor: chartTheme.tooltipBackground,
-              titleColor: chartTheme.tooltipTitle,
-              bodyColor: chartTheme.tooltipBody,
+              backgroundColor: "rgba(17,17,22,0.94)",
+              titleColor: "#ffffff",
+              bodyColor: "#d1d5db",
               borderColor: "rgba(34,171,148,0.45)",
               borderWidth: 1,
               padding: 10,
@@ -1819,14 +1797,8 @@ export default function CandleChart({
       />
       </div>
 
-      <div
-        className={`${compact ? "h-[18%] min-h-8 max-h-14" : "h-[19%] min-h-14 max-h-28"} shrink-0 border-t border-white/[0.06] px-1 pb-1 pt-1`}
-        style={{ backgroundColor: chartTheme.volumeBackground }}
-      >
-        <div
-          className="mb-0.5 flex h-3 items-center justify-between px-1 text-[9px] font-semibold"
-          style={{ color: chartTheme.volumeLabel }}
-        >
+      <div className={`${compact ? "h-[18%] min-h-8 max-h-14" : "h-[19%] min-h-14 max-h-28"} shrink-0 border-t border-white/[0.06] bg-[#111116] px-1 pb-1 pt-1`}>
+        <div className="mb-0.5 flex h-3 items-center justify-between px-1 text-[9px] font-semibold text-[#8b949e]">
           <span>Объём</span>
           <span className="text-[#22ab94]">
             {maxVolume >= 1_000_000

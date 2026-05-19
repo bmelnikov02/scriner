@@ -33,8 +33,6 @@ type BinanceTicker = {
 };
 
 type CoinSortMode = "volume" | "alphabet";
-type ThemeMode = "dark" | "light";
-
 type DrawingsByChart = Record<string, ChartDrawing[]>;
 type FavoriteColors = Record<string, string>;
 
@@ -47,7 +45,6 @@ type SavedWorkspace = {
   favorites?: string[];
   gridCount?: number;
   pageIndex?: number;
-  themeMode?: ThemeMode;
 };
 
 type WsMessage =
@@ -261,10 +258,6 @@ function isSortMode(value: unknown): value is CoinSortMode {
   return value === "volume" || value === "alphabet";
 }
 
-function isThemeMode(value: unknown): value is ThemeMode {
-  return value === "dark" || value === "light";
-}
-
 function getChartColumnCount(count: number) {
   if (count <= 1) return 1;
   if (count <= 5) return 2;
@@ -300,7 +293,6 @@ export default function Home() {
   );
   const [pageIndex, setPageIndex] = useState(0);
   const [coinSortMode, setCoinSortMode] = useState<CoinSortMode>("volume");
-  const [themeMode, setThemeMode] = useState<ThemeMode>("dark");
   const [workspaceLoaded, setWorkspaceLoaded] = useState(false);
   const [quickSearchText, setQuickSearchText] = useState("");
   const [quickSearchVisible, setQuickSearchVisible] = useState(false);
@@ -435,10 +427,6 @@ export default function Home() {
           setCoinSortMode(saved.coinSortMode);
         }
 
-        if (isThemeMode(saved.themeMode)) {
-          setThemeMode(saved.themeMode);
-        }
-
       if (typeof saved.alertsEnabled === "boolean") {
         setAlertsEnabled(saved.alertsEnabled);
       }
@@ -468,7 +456,6 @@ export default function Home() {
       favorites,
       gridCount,
       pageIndex: safePageIndex,
-      themeMode,
     };
 
     try {
@@ -488,17 +475,8 @@ export default function Home() {
     favorites,
     gridCount,
     safePageIndex,
-    themeMode,
     workspaceLoaded,
   ]);
-
-  useEffect(() => {
-    document.documentElement.dataset.theme = themeMode;
-  }, [themeMode]);
-
-  function toggleTheme() {
-    setThemeMode((value) => (value === "dark" ? "light" : "dark"));
-  }
 
   const playAlertSound = useCallback(() => {
     const context = audioContextRef.current ?? new window.AudioContext();
@@ -1082,7 +1060,6 @@ export default function Home() {
   const chartColumnCount = getChartColumnCount(visibleSymbols.length);
   const hasWideBottomChart =
     visibleSymbols.length > 1 && visibleSymbols.length % 2 === 1;
-  const isLightTheme = themeMode === "light";
   const chartGridStyle = {
     gridAutoRows: "minmax(0, 1fr)",
     gridTemplateColumns: `repeat(${chartColumnCount}, minmax(0, 1fr))`,
@@ -1091,11 +1068,7 @@ export default function Home() {
     "lg:grid-cols-[minmax(0,1fr)_250px] xl:grid-cols-[minmax(0,1fr)_260px]";
 
   return (
-    <main
-      className={`h-screen overflow-hidden bg-[#030608] text-[#d9dee5] ${
-        isLightTheme ? "theme-light" : "theme-dark"
-      }`}
-    >
+    <main className="h-screen overflow-hidden bg-[#030608] text-[#d9dee5]">
       <div
         className={`grid h-screen min-h-0 grid-cols-1 gap-0 overflow-hidden p-0 transition-[grid-template-columns] duration-200 ${shellGridClass}`}
       >
@@ -1344,15 +1317,6 @@ export default function Home() {
             <div className="absolute right-3 top-3 flex items-center justify-end gap-2">
               <button
                 type="button"
-                onClick={toggleTheme}
-                className="grid size-8 place-items-center rounded-md border border-white/10 bg-black/20 text-xs font-black text-white/70 transition hover:border-[#c8b6dc]/50 hover:bg-[#c8b6dc]/10 hover:text-[#c8b6dc]"
-                title={isLightTheme ? "Dark theme" : "Light theme"}
-                aria-label="Toggle theme"
-              >
-                {isLightTheme ? "D" : "L"}
-              </button>
-              <button
-                type="button"
                 onClick={toggleAlerts}
                 className={`hidden rounded-lg border px-4 py-2 text-sm font-semibold transition ${
                   alertsEnabled
@@ -1541,7 +1505,6 @@ export default function Home() {
                       timeframe={timeframe}
                       heightClass={chartHeight}
                       compact
-                      themeMode={themeMode}
                       drawings={drawingsByChart[drawingKey] ?? []}
                       onNeedOlderCandles={(oldestTime) =>
                         void loadOlderCandles(symbol, oldestTime)
@@ -1785,7 +1748,6 @@ export default function Home() {
               candles={candles[fullscreenSymbol] || []}
               timeframe={timeframe}
               heightClass="min-h-0 flex-1"
-              themeMode={themeMode}
               showTools
               timeframeControls={{
                 active: timeframe,
