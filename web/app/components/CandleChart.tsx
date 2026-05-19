@@ -201,6 +201,24 @@ function formatRulerTime(ms: number) {
   return `${days.toFixed(days >= 10 ? 0 : 1)}d`;
 }
 
+function getRecentCandleSpacing(candles: Candle[]) {
+  const spacings: number[] = [];
+
+  for (let index = candles.length - 1; index > 0 && spacings.length < 12; index -= 1) {
+    const spacing = candles[index].x - candles[index - 1].x;
+
+    if (Number.isFinite(spacing) && spacing > 0) {
+      spacings.push(spacing);
+    }
+  }
+
+  if (spacings.length === 0) return 60_000;
+
+  spacings.sort((a, b) => a - b);
+
+  return spacings[Math.floor(spacings.length / 2)];
+}
+
 function getNicePriceStep(range: number, tickCount: number) {
   const rawStep = Math.max(range / Math.max(1, tickCount - 1), Number.EPSILON);
   const exponent = Math.floor(Math.log10(rawStep));
@@ -925,11 +943,15 @@ export default function CandleChart({
   );
   const oldestCandleTime = candles[0]?.x;
   const newestCandleTime = candles.at(-1)?.x;
+  const candleSpacing = getRecentCandleSpacing(candles);
+  const rightCandlePadding = candleSpacing * (compact ? 5 : 8);
+  const newestVisibleTime =
+    newestCandleTime !== undefined ? newestCandleTime + rightCandlePadding : undefined;
   const loadedXRange =
     oldestCandleTime !== undefined &&
-    newestCandleTime !== undefined &&
-    newestCandleTime > oldestCandleTime
-      ? newestCandleTime - oldestCandleTime
+    newestVisibleTime !== undefined &&
+    newestVisibleTime > oldestCandleTime
+      ? newestVisibleTime - oldestCandleTime
       : 0;
   const candleColors = {
     backgroundColors: {
@@ -982,7 +1004,7 @@ export default function CandleChart({
   function clampXRangeToCandles(range: XRange): XRange | null {
     if (
       oldestCandleTime === undefined ||
-      newestCandleTime === undefined ||
+      newestVisibleTime === undefined ||
       loadedXRange <= 0
     ) {
       return null;
@@ -997,14 +1019,14 @@ export default function CandleChart({
         symbol,
         timeframe,
         min: oldestCandleTime,
-        max: newestCandleTime,
+        max: newestVisibleTime,
       };
     }
 
     const hasCandlesInView =
-      range.max >= oldestCandleTime && range.min <= newestCandleTime;
+      range.max >= oldestCandleTime && range.min <= newestVisibleTime;
     const emptyLeft = Math.max(0, oldestCandleTime - range.min);
-    const emptyRight = Math.max(0, range.max - newestCandleTime);
+    const emptyRight = Math.max(0, range.max - newestVisibleTime);
     const tooMuchEmptySpace =
       !hasCandlesInView ||
       emptyLeft > visibleRange * 0.08 ||
@@ -1024,8 +1046,8 @@ export default function CandleChart({
     return {
       symbol,
       timeframe,
-      min: newestCandleTime - visibleRange,
-      max: newestCandleTime,
+      min: newestVisibleTime - visibleRange,
+      max: newestVisibleTime,
     };
   }
 
@@ -1050,7 +1072,7 @@ export default function CandleChart({
         chartRef.current?.draw();
       });
     }
-  }, [candles, currentXRange, loadedXRange, oldestCandleTime, newestCandleTime]);
+  }, [candles, currentXRange, loadedXRange, oldestCandleTime, newestVisibleTime]);
 
   function redrawChart() {
     window.requestAnimationFrame(() => chartRef.current?.draw());
@@ -1649,7 +1671,7 @@ export default function CandleChart({
               type: "time",
               offset: false,
               min: currentXRange?.min,
-              max: currentXRange?.max,
+              max: currentXRange?.max ?? newestVisibleTime,
               ticks: {
                 autoSkip: true,
                 maxTicksLimit,
@@ -1715,11 +1737,11 @@ export default function CandleChart({
               limits: {
                 x:
                   oldestCandleTime !== undefined &&
-                  newestCandleTime !== undefined &&
-                  newestCandleTime > oldestCandleTime
+                  newestVisibleTime !== undefined &&
+                  newestVisibleTime > oldestCandleTime
                     ? {
                         min: oldestCandleTime,
-                        max: newestCandleTime,
+                        max: newestVisibleTime,
                       }
                     : undefined,
               },
