@@ -28,6 +28,56 @@ body {
   overscroll-behavior: none;
 }
 
+html[data-theme="light"],
+html[data-theme="light"] body {
+  background: #ece8f4;
+  color: #201827;
+}
+
+.theme-light {
+  background: #ece8f4 !important;
+  color: #201827 !important;
+}
+
+.theme-light [class*="bg-[#080d11]"],
+.theme-light [class*="bg-[#05090c]"],
+.theme-light [class*="bg-[#0b1116]"],
+.theme-light [class*="bg-[#10161c]"] {
+  background-color: #f6f2fb !important;
+}
+
+.theme-light [class*="bg-black/20"] {
+  background-color: rgba(255, 255, 255, 0.58) !important;
+}
+
+.theme-light [class*="bg-white/[0.025]"] {
+  background-color: rgba(255, 255, 255, 0.44) !important;
+}
+
+.theme-light [class*="border-white"] {
+  border-color: rgba(104, 82, 128, 0.24) !important;
+}
+
+.theme-light [class*="text-white"] {
+  color: rgba(32, 24, 39, 0.78) !important;
+}
+
+.theme-light [class*="text-[#c8b6dc]"] {
+  color: #7a6598 !important;
+}
+
+.theme-light input {
+  color: #201827 !important;
+}
+
+.theme-light input::placeholder {
+  color: rgba(32, 24, 39, 0.42) !important;
+}
+
+.theme-light [class*="shadow-[0_0_35px"] {
+  box-shadow: 0 0 24px rgba(89, 70, 112, 0.12) !important;
+}
+
 * {
   box-sizing: border-box;
 }
