@@ -991,6 +991,8 @@ export default function CandleChart({
   }));
   const [xRange, setXRange] = useState<XRange | null>(null);
   const [yRange, setYRange] = useState<YRange | null>(null);
+  const [hoverXRange, setHoverXRange] = useState<XRange | null>(null);
+  const [hoverYRange, setHoverYRange] = useState<YRange | null>(null);
   const [drawingTool, setDrawingTool] = useState<DrawingTool>("cursor");
   const [activeToolPanel, setActiveToolPanel] = useState<"tf" | "draw" | null>(null);
   const [drawingWindowStart, setDrawingWindowStart] = useState(0);
@@ -1039,10 +1041,20 @@ export default function CandleChart({
     xRange?.symbol === symbol && xRange.timeframe === timeframe ? xRange : null;
   const currentYRange =
     yRange?.symbol === symbol && yRange.timeframe === timeframe ? yRange : null;
+  const currentHoverXRange =
+    hoverXRange?.symbol === symbol && hoverXRange.timeframe === timeframe
+      ? hoverXRange
+      : null;
+  const currentHoverYRange =
+    hoverYRange?.symbol === symbol && hoverYRange.timeframe === timeframe
+      ? hoverYRange
+      : null;
+  const activeXRange = currentXRange ?? currentHoverXRange;
+  const activeYRange = currentYRange ?? currentHoverYRange;
   const visibleVolumeCandles = candles.filter(
     (candle) =>
-      !currentXRange ||
-      (candle.x >= currentXRange.min && candle.x <= currentXRange.max)
+      !activeXRange ||
+      (candle.x >= activeXRange.min && candle.x <= activeXRange.max)
   );
   const volumeCandles =
     visibleVolumeCandles.length > 0 ? visibleVolumeCandles : candles;
@@ -1187,6 +1199,37 @@ export default function CandleChart({
     window.requestAnimationFrame(() => chartRef.current?.draw());
   }
 
+  function lockChartRangeWhileHovered() {
+    const chart = chartRef.current;
+    const xScale = chart?.scales.x;
+    const yScale = chart?.scales.y;
+
+    if (!xScale || !yScale) return;
+
+    if (!currentXRange) {
+      setHoverXRange({
+        symbol,
+        timeframe,
+        min: xScale.min,
+        max: xScale.max,
+      });
+    }
+
+    if (!currentYRange) {
+      setHoverYRange({
+        symbol,
+        timeframe,
+        min: yScale.min,
+        max: yScale.max,
+      });
+    }
+  }
+
+  function releaseHoveredChartRange() {
+    setHoverXRange(null);
+    setHoverYRange(null);
+  }
+
   function updateCursorPrice(event: React.PointerEvent<HTMLDivElement>) {
     const chart = chartRef.current;
     const yScale = chart?.scales.y;
@@ -1209,6 +1252,7 @@ export default function CandleChart({
 
   function clearCursorPrice() {
     cursorPriceRef.current = null;
+    releaseHoveredChartRange();
     redrawChart();
   }
 
@@ -1683,6 +1727,7 @@ export default function CandleChart({
       className={`relative flex h-full min-h-0 flex-col overflow-hidden ${heightClass}`}
       style={{ backgroundColor: CHART_BACKGROUND_COLOR }}
       onPointerMove={updateCursorPrice}
+      onPointerEnter={lockChartRangeWhileHovered}
       onPointerLeave={clearCursorPrice}
       onContextMenu={leaveDrawingMode}
     >
@@ -1894,8 +1939,8 @@ export default function CandleChart({
             x: {
               type: "time",
               offset: false,
-              min: currentXRange?.min,
-              max: currentXRange?.max ?? newestVisibleTime,
+              min: activeXRange?.min,
+              max: activeXRange?.max ?? newestVisibleTime,
               ticks: {
                 autoSkip: true,
                 maxTicksLimit,
@@ -1913,8 +1958,8 @@ export default function CandleChart({
             },
             y: {
               position: "right",
-              min: currentYRange?.min ?? (candles.length ? autoYMin : undefined),
-              max: currentYRange?.max ?? (candles.length ? autoYMax : undefined),
+              min: activeYRange?.min ?? (candles.length ? autoYMin : undefined),
+              max: activeYRange?.max ?? (candles.length ? autoYMax : undefined),
               ticks: {
                 color: "#8b949e",
                 maxTicksLimit,
