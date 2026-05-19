@@ -154,7 +154,22 @@ const DRAWING_TABLE_ITEMS: DrawingPanelItem[] = [
   { kind: "tool", tool: "horizontal", title: "Horizontal line" },
   { kind: "tool", tool: "ruler", title: "Ruler - hold Shift" },
 ];
+const DRAWING_TOOL_VALUES: DrawingTool[] = [
+  "cursor",
+  "trend",
+  "horizontal",
+  "vertical",
+  "rectangle",
+  "arrow-right",
+  "arrow-up",
+  "arrow-left",
+  "arrow-down",
+  "trajectory",
+  "ruler",
+  "triangle",
+];
 const DRAWING_WINDOW_SIZE = 5;
+const DRAWING_FAVORITES_STORAGE_KEY = "scriner-drawing-tool-favorites-v1";
 const DRAWING_LINE_COLOR = "#d15bff";
 const DRAWING_ACTIVE_COLOR = "#ff74d6";
 const DRAWING_FILL_COLOR = "rgba(255, 79, 216, 0.16)";
@@ -171,6 +186,13 @@ function formatLinePrice(value: number) {
   if (value >= 100) return value.toFixed(1);
   if (value >= 1) return value.toFixed(4);
   return value.toFixed(6);
+}
+
+function isStoredDrawingTool(value: unknown): value is DrawingTool {
+  return (
+    typeof value === "string" &&
+    DRAWING_TOOL_VALUES.includes(value as DrawingTool)
+  );
 }
 
 function getTickPrecision(step: number) {
@@ -975,6 +997,10 @@ export default function CandleChart({
   const [localDrawings, setLocalDrawings] = useState<Drawing[]>([]);
   const [draftDrawing, setDraftDrawing] = useState<Drawing | null>(null);
   const [shiftPressed, setShiftPressed] = useState(false);
+  const [favoriteDrawingTools, setFavoriteDrawingTools] = useState<DrawingTool[]>(
+    []
+  );
+  const [drawingFavoritesLoaded, setDrawingFavoritesLoaded] = useState(false);
   const drawings = controlledDrawings ?? localDrawings;
   const lastCandle = candles.at(-1);
   const lows = candles.map((candle) => candle.l);
@@ -996,6 +1022,16 @@ export default function CandleChart({
     drawingWindowStart,
     drawingWindowStart + DRAWING_WINDOW_SIZE
   );
+  const favoriteDrawingItems = favoriteDrawingTools
+    .map((tool) =>
+      DRAWING_TABLE_ITEMS.find(
+        (item): item is Extract<DrawingPanelItem, { kind: "tool" }> =>
+          item.kind === "tool" && item.tool === tool
+      )
+    )
+    .filter((item): item is Extract<DrawingPanelItem, { kind: "tool" }> =>
+      Boolean(item)
+    );
   const canShiftDrawingLeft = drawingWindowStart > 0;
   const canShiftDrawingRight =
     drawingWindowStart < DRAWING_PANEL_ITEMS.length - DRAWING_WINDOW_SIZE;
@@ -1184,6 +1220,41 @@ export default function CandleChart({
   }, [drawings, draftDrawing, toolsEnabled]);
 
   useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem(DRAWING_FAVORITES_STORAGE_KEY);
+
+      if (!raw) {
+        setDrawingFavoritesLoaded(true);
+        return;
+      }
+
+      const saved = JSON.parse(raw);
+
+      if (Array.isArray(saved)) {
+        setFavoriteDrawingTools(saved.filter(isStoredDrawingTool));
+      }
+
+    } catch (error) {
+      console.error("Drawing favorites restore error:", error);
+    } finally {
+      setDrawingFavoritesLoaded(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!drawingFavoritesLoaded) return;
+
+    try {
+      window.localStorage.setItem(
+        DRAWING_FAVORITES_STORAGE_KEY,
+        JSON.stringify(favoriteDrawingTools)
+      );
+    } catch (error) {
+      console.error("Drawing favorites save error:", error);
+    }
+  }, [drawingFavoritesLoaded, favoriteDrawingTools]);
+
+  useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === "Shift") {
         setShiftPressed(true);
@@ -1236,6 +1307,21 @@ export default function CandleChart({
     }
 
     redrawChart();
+  }
+
+  function selectDrawingTool(tool: DrawingTool) {
+    setDrawingTool(tool);
+    resetDraftDrawing();
+    trajectoryLastPointRef.current = null;
+    redrawChart();
+  }
+
+  function toggleFavoriteDrawingTool(tool: DrawingTool) {
+    setFavoriteDrawingTools((current) =>
+      current.includes(tool)
+        ? current.filter((item) => item !== tool)
+        : [...current, tool]
+    );
   }
 
   function rememberChartRange({ chart }: ZoomEvent) {
@@ -1679,40 +1765,63 @@ export default function CandleChart({
           {activeToolPanel === "draw" && (
             <div className="grid grid-cols-3 bg-[#120817]/78 text-[#f1c7ff]">
               {DRAWING_TABLE_ITEMS.map((item, index) => (
-                <button
+                <div
                   key={item.kind === "clear" ? item.id : item.tool}
-                  type="button"
-                  onClick={() => {
-                    if (item.kind === "clear") {
-                      updateDrawings(() => []);
-                      resetDraftDrawing();
-                      trajectoryLastPointRef.current = null;
-                      redrawChart();
-                      return;
-                    }
-
-                    setDrawingTool(item.tool);
-                    resetDraftDrawing();
-                    trajectoryLastPointRef.current = null;
-                    redrawChart();
-                  }}
-                  disabled={item.kind === "clear" && drawings.length === 0 && !draftDrawing}
-                  className={`grid h-14 place-items-center border-t border-[#d15bff]/30 transition ${
+                  className={`relative h-14 border-t border-[#d15bff]/30 ${
                     index % 3 !== 2 ? "border-r border-[#d15bff]/30" : ""
-                  } disabled:pointer-events-none disabled:opacity-35 ${
-                    item.kind === "tool" && drawingTool === item.tool
-                      ? item.tool === "cursor"
-                        ? "bg-[#c8b6dc]/18 text-[#c8b6dc] shadow-[inset_0_0_18px_rgba(200,182,220,0.16)]"
-                        : "bg-[#d15bff]/24 text-white shadow-[inset_0_0_18px_rgba(255,79,216,0.18)]"
-                      : "text-[#e7a8ff] hover:bg-[#d15bff]/12 hover:text-white"
                   }`}
-                  title={item.title}
                 >
-                  <DrawingPanelIcon
-                    item={item}
-                    active={item.kind === "tool" && drawingTool === item.tool}
-                  />
-                </button>
+                  {item.kind === "tool" && (
+                    <button
+                      type="button"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        toggleFavoriteDrawingTool(item.tool);
+                      }}
+                      className={`absolute right-1 top-1 z-10 grid size-4 place-items-center text-[11px] leading-none transition hover:scale-110 ${
+                        favoriteDrawingTools.includes(item.tool)
+                          ? "text-[#c8b6dc]"
+                          : "text-white/28 hover:text-[#c8b6dc]"
+                      }`}
+                      title={
+                        favoriteDrawingTools.includes(item.tool)
+                          ? "Remove from drawing favorites"
+                          : "Add to drawing favorites"
+                      }
+                    >
+                      ★
+                    </button>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (item.kind === "clear") {
+                        updateDrawings(() => []);
+                        resetDraftDrawing();
+                        trajectoryLastPointRef.current = null;
+                        redrawChart();
+                        return;
+                      }
+
+                      selectDrawingTool(item.tool);
+                    }}
+                    disabled={item.kind === "clear" && drawings.length === 0 && !draftDrawing}
+                    className={`grid h-full w-full place-items-center transition disabled:pointer-events-none disabled:opacity-35 ${
+                      item.kind === "tool" && drawingTool === item.tool
+                        ? item.tool === "cursor"
+                          ? "bg-[#c8b6dc]/18 text-[#c8b6dc] shadow-[inset_0_0_18px_rgba(200,182,220,0.16)]"
+                          : "bg-[#d15bff]/24 text-white shadow-[inset_0_0_18px_rgba(255,79,216,0.18)]"
+                        : "text-[#e7a8ff] hover:bg-[#d15bff]/12 hover:text-white"
+                    }`}
+                    title={item.title}
+                  >
+                    <DrawingPanelIcon
+                      item={item}
+                      active={item.kind === "tool" && drawingTool === item.tool}
+                    />
+                  </button>
+                </div>
               ))}
             </div>
           )}
@@ -1720,6 +1829,40 @@ export default function CandleChart({
       )}
 
       <div className="relative min-h-0 flex-1">
+      {toolsEnabled && (
+        <div className="absolute left-0 top-0 z-[70] flex max-w-[calc(100%-48px)] items-start gap-1 rounded-br-md border-b border-r border-[#c8b6dc]/25 bg-[#08040d]/86 p-1 shadow-[0_0_16px_rgba(200,182,220,0.14)] backdrop-blur">
+          <div
+            className={`grid size-7 shrink-0 place-items-center text-sm leading-none ${
+              favoriteDrawingItems.length > 0 ? "text-[#c8b6dc]" : "text-white/38"
+            }`}
+            title="Drawing favorites"
+          >
+            ★
+          </div>
+          {favoriteDrawingItems.length > 0 && (
+            <div className="flex flex-wrap gap-1">
+              {favoriteDrawingItems.map((item) => (
+                <button
+                  key={item.tool}
+                  type="button"
+                  onClick={() => selectDrawingTool(item.tool)}
+                  className={`grid size-7 place-items-center rounded border border-[#c8b6dc]/20 transition hover:border-[#c8b6dc]/50 hover:bg-[#c8b6dc]/12 ${
+                    drawingTool === item.tool
+                      ? "bg-[#c8b6dc]/18 text-[#c8b6dc]"
+                      : "text-[#e7a8ff]"
+                  }`}
+                  title={item.title}
+                >
+                  <DrawingPanelIcon
+                    item={item}
+                    active={drawingTool === item.tool}
+                  />
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
       <Chart
         className="!h-full !w-full"
         ref={chartRef}
