@@ -173,10 +173,6 @@ function formatLinePrice(value: number) {
   return value.toFixed(6);
 }
 
-function formatSignedLinePrice(value: number) {
-  return `${value >= 0 ? "+" : "-"}${formatLinePrice(Math.abs(value))}`;
-}
-
 function getTickPrecision(step: number) {
   if (step >= 1) return 0;
   return Math.min(8, Math.max(0, Math.ceil(-Math.log10(step)) + 1));
@@ -184,21 +180,6 @@ function getTickPrecision(step: number) {
 
 function formatAxisPrice(value: number, step: number) {
   return value.toFixed(getTickPrecision(step));
-}
-
-function formatRulerTime(ms: number) {
-  const absMs = Math.abs(ms);
-  const minutes = Math.round(absMs / 60_000);
-
-  if (minutes < 60) return `${minutes}m`;
-
-  const hours = minutes / 60;
-
-  if (hours < 24) return `${hours.toFixed(hours >= 10 ? 0 : 1)}h`;
-
-  const days = hours / 24;
-
-  return `${days.toFixed(days >= 10 ? 0 : 1)}d`;
 }
 
 function getRecentCandleSpacing(candles: Candle[]) {
@@ -217,6 +198,39 @@ function getRecentCandleSpacing(candles: Candle[]) {
   spacings.sort((a, b) => a - b);
 
   return spacings[Math.floor(spacings.length / 2)];
+}
+
+function getTimeframeMs(timeframe: string) {
+  const unit = timeframe.at(-1);
+  const value = Number(timeframe.slice(0, -1));
+
+  if (!Number.isFinite(value) || value <= 0 || !unit) return null;
+
+  if (unit === "m") return value * 60_000;
+  if (unit === "h") return value * 60 * 60_000;
+  if (unit === "d") return value * 24 * 60 * 60_000;
+  if (unit === "w") return value * 7 * 24 * 60 * 60_000;
+  if (unit === "M") return value * 30 * 24 * 60 * 60_000;
+
+  return null;
+}
+
+function formatRulerDuration(ms: number) {
+  const totalMinutes = Math.max(0, Math.round(ms / 60_000));
+  const days = Math.floor(totalMinutes / (24 * 60));
+  const hours = Math.floor((totalMinutes - days * 24 * 60) / 60);
+  const minutes = totalMinutes % 60;
+  const parts: string[] = [];
+
+  if (days > 0) parts.push(`${days}д`);
+  if (hours > 0) parts.push(`${hours}ч`);
+  if (minutes > 0) parts.push(`${minutes}м`);
+
+  return parts.length ? parts.join(" ") : "0м";
+}
+
+function formatBarCount(value: number) {
+  return `${value} бар${value === 1 ? "" : "ов"}`;
 }
 
 function getNicePriceStep(range: number, tickCount: number) {
@@ -703,26 +717,26 @@ export default function CandleChart({
 
         const priceDiff = end.y - start.y;
         const percentDiff = start.y !== 0 ? (priceDiff / start.y) * 100 : 0;
-        const timeDiff = end.x - start.x;
-        const label = `${formatSignedLinePrice(priceDiff)} (${
-          percentDiff >= 0 ? "+" : ""
-        }${percentDiff.toFixed(2)}%)  ${formatRulerTime(
-          timeDiff
-        )}`;
-        const labelX = Math.min(
-          Math.max(chartArea.left + 6, (x1 + x2) / 2),
-          chartArea.right - 6
+        const timeframeMs = getTimeframeMs(timeframe) ?? getRecentCandleSpacing(candles);
+        const barCount = Math.max(
+          0,
+          Math.round(Math.abs(end.x - start.x) / Math.max(1, timeframeMs))
         );
-        const labelY = Math.min(
-          Math.max(chartArea.top + 18, (y1 + y2) / 2 - 14),
-          chartArea.bottom - 8
-        );
+        const elapsedMs = barCount * timeframeMs;
+        const labelLines = [
+          `${percentDiff >= 0 ? "+" : ""}${percentDiff.toFixed(2)}%`,
+          formatBarCount(barCount),
+          formatRulerDuration(elapsedMs),
+        ];
+        const angle = Math.atan2(y2 - y1, x2 - x1);
+        const headLength = 14;
 
         ctx.save();
         ctx.strokeStyle = draft ? DRAWING_ACTIVE_COLOR : DRAWING_LINE_COLOR;
         ctx.fillStyle = draft ? DRAWING_ACTIVE_COLOR : DRAWING_LINE_COLOR;
-        ctx.lineWidth = draft ? 2.4 : 2.2;
+        ctx.lineWidth = draft ? 2.5 : 2.3;
         ctx.lineCap = "round";
+        ctx.lineJoin = "round";
         ctx.shadowBlur = 8;
         ctx.shadowColor = DRAWING_LINE_COLOR;
 
@@ -735,36 +749,54 @@ export default function CandleChart({
         ctx.lineTo(x2, y2);
         ctx.stroke();
         ctx.setLineDash([]);
-
-        [x1, x2].forEach((x, index) => {
-          const y = index === 0 ? y1 : y2;
-          ctx.beginPath();
-          ctx.arc(x, y, 4, 0, Math.PI * 2);
-          ctx.fill();
-        });
+        ctx.beginPath();
+        ctx.moveTo(x2, y2);
+        ctx.lineTo(
+          x2 - headLength * Math.cos(angle - Math.PI / 6),
+          y2 - headLength * Math.sin(angle - Math.PI / 6)
+        );
+        ctx.lineTo(
+          x2 - headLength * Math.cos(angle + Math.PI / 6),
+          y2 - headLength * Math.sin(angle + Math.PI / 6)
+        );
+        ctx.closePath();
+        ctx.fill();
 
         ctx.shadowBlur = 0;
-        ctx.font = "700 11px Arial, Helvetica, sans-serif";
-        const paddingX = 7;
-        const labelHeight = 20;
-        const labelWidth = Math.ceil(ctx.measureText(label).width + paddingX * 2);
+        ctx.font = "800 11px Arial, Helvetica, sans-serif";
+        const paddingX = 8;
+        const paddingY = 6;
+        const lineHeight = 13;
+        const labelWidth = Math.ceil(
+          Math.max(...labelLines.map((line) => ctx.measureText(line).width)) +
+            paddingX * 2
+        );
+        const labelHeight = paddingY * 2 + labelLines.length * lineHeight;
+        const middleX = (x1 + x2) / 2;
+        const middleY = (y1 + y2) / 2;
         const left = Math.min(
-          Math.max(chartArea.left + 4, labelX - labelWidth / 2),
+          Math.max(chartArea.left + 4, middleX - labelWidth / 2),
           chartArea.right - labelWidth - 4
+        );
+        const top = Math.min(
+          Math.max(chartArea.top + 4, middleY - labelHeight - 12),
+          chartArea.bottom - labelHeight - 4
         );
 
         ctx.fillStyle = "rgba(12,6,18,0.92)";
         ctx.strokeStyle = DRAWING_LINE_COLOR;
         ctx.lineWidth = 1;
         ctx.beginPath();
-        ctx.roundRect(left, labelY - labelHeight / 2, labelWidth, labelHeight, 5);
+        ctx.roundRect(left, top, labelWidth, labelHeight, 4);
         ctx.fill();
         ctx.stroke();
 
         ctx.fillStyle = "#f4d8ff";
         ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-        ctx.fillText(label, left + labelWidth / 2, labelY);
+        ctx.textBaseline = "top";
+        labelLines.forEach((line, index) => {
+          ctx.fillText(line, left + labelWidth / 2, top + paddingY + index * lineHeight);
+        });
         ctx.restore();
       };
       const drawArrow = (
