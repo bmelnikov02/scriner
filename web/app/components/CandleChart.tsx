@@ -35,16 +35,6 @@ type Candle = {
   v?: number;
 };
 
-type OrderDensity = {
-  symbol: string;
-  side: "bid" | "ask";
-  price: number;
-  quantity: number;
-  notional: number;
-  score: number;
-  firstSeen: number;
-};
-
 type Props = {
   symbol: string;
   candles: Candle[];
@@ -63,9 +53,6 @@ type Props = {
   drawings?: Drawing[];
   onDrawingsChange?: (drawings: Drawing[]) => void;
   onNeedOlderCandles?: (oldestTime: number) => void;
-  orderDensities?: OrderDensity[];
-  densityLevel?: number;
-  onDensityLevelChange?: (value: number) => void;
 };
 
 type XRange = {
@@ -456,9 +443,6 @@ export default function CandleChart({
   drawings: controlledDrawings,
   onDrawingsChange,
   onNeedOlderCandles,
-  orderDensities = [],
-  densityLevel = 700,
-  onDensityLevelChange,
 }: Props) {
   const chartRef = useRef<ChartJS | null>(null);
   const yScaleDragRef = useRef<YScaleDrag | null>(null);
@@ -468,8 +452,6 @@ export default function CandleChart({
   const drawingsRef = useRef<Drawing[]>([]);
   const draftDrawingRef = useRef<Drawing | null>(null);
   const toolsEnabledRef = useRef(false);
-  const orderDensitiesRef = useRef<OrderDensity[]>([]);
-  const densityLevelRef = useRef(densityLevel);
   const trajectoryLastPointRef = useRef<DrawingPoint | null>(null);
   const olderCandlesRequestRef = useRef<{
     oldestTime: number;
@@ -541,72 +523,6 @@ export default function CandleChart({
         ctx.textBaseline = "middle";
         ctx.fillText(text, x + labelWidth / 2, labelY + labelHeight / 2);
         ctx.restore();
-      };
-      const drawOrderDensities = () => {
-        const densities = orderDensitiesRef.current;
-        const minScore = densityLevelRef.current;
-
-        if (!densities.length) return;
-
-        densities
-          .filter((item) => item.side === "bid" && item.score >= minScore)
-          .slice(0, 28)
-          .forEach((item) => {
-            const y = yScale.getPixelForValue(item.price);
-            const rawStartX = xScale.getPixelForValue(item.firstSeen);
-
-            if (
-              !Number.isFinite(y) ||
-              !Number.isFinite(rawStartX) ||
-              y < chartArea.top ||
-              y > chartArea.bottom ||
-              rawStartX > chartArea.right
-            ) {
-              return;
-            }
-
-            const strength = Math.min(1, Math.max(0.12, item.score / 999));
-            const x = Math.max(chartArea.left, rawStartX);
-            const label = `${item.score}`;
-
-            ctx.save();
-            ctx.shadowBlur = 10 * strength;
-            ctx.shadowColor = DRAWING_LINE_COLOR;
-            ctx.strokeStyle = `rgba(200,182,220,${0.22 + strength * 0.45})`;
-            ctx.lineWidth = 1 + strength * 2.2;
-            ctx.beginPath();
-            ctx.moveTo(x, y);
-            ctx.lineTo(chartArea.right, y);
-            ctx.stroke();
-
-            ctx.shadowBlur = 0;
-            ctx.fillStyle = `rgba(200,182,220,${0.08 + strength * 0.16})`;
-            ctx.beginPath();
-            ctx.roundRect(x, y - 4, Math.max(10, chartArea.right - x), 8, 4);
-            ctx.fill();
-
-            ctx.font = "800 9px Arial, Helvetica, sans-serif";
-            const labelWidth = Math.max(28, ctx.measureText(label).width + 10);
-            const labelX = chartArea.right - labelWidth - 5;
-            const labelY = Math.min(
-              Math.max(chartArea.top + 3, y - 8),
-              chartArea.bottom - 17
-            );
-
-            ctx.fillStyle = "rgba(8,4,13,0.9)";
-            ctx.strokeStyle = `rgba(200,182,220,${0.35 + strength * 0.45})`;
-            ctx.lineWidth = 1;
-            ctx.beginPath();
-            ctx.roundRect(labelX, labelY, labelWidth, 16, 4);
-            ctx.fill();
-            ctx.stroke();
-
-            ctx.fillStyle = "#f4d8ff";
-            ctx.textAlign = "center";
-            ctx.textBaseline = "middle";
-            ctx.fillText(label, labelX + labelWidth / 2, labelY + 8);
-            ctx.restore();
-          });
       };
       const drawCursorPriceLabel = () => {
         const price = cursorPriceRef.current;
@@ -1004,8 +920,6 @@ export default function CandleChart({
         ? [...currentDrawings, currentDraft]
         : currentDrawings;
 
-      drawOrderDensities();
-
       drawableItems.forEach((item) => {
         const startX = xScale.getPixelForValue(item.start.x);
         const startY = yScale.getPixelForValue(item.start.y);
@@ -1078,9 +992,7 @@ export default function CandleChart({
   const [xRange, setXRange] = useState<XRange | null>(null);
   const [yRange, setYRange] = useState<YRange | null>(null);
   const [drawingTool, setDrawingTool] = useState<DrawingTool>("cursor");
-  const [activeToolPanel, setActiveToolPanel] = useState<
-    "tf" | "draw" | "do" | null
-  >(null);
+  const [activeToolPanel, setActiveToolPanel] = useState<"tf" | "draw" | null>(null);
   const [drawingWindowStart, setDrawingWindowStart] = useState(0);
   const [localDrawings, setLocalDrawings] = useState<Drawing[]>([]);
   const [draftDrawing, setDraftDrawing] = useState<Drawing | null>(null);
@@ -1304,10 +1216,8 @@ export default function CandleChart({
     drawingsRef.current = drawings;
     draftDrawingRef.current = draftDrawing;
     toolsEnabledRef.current = toolsEnabled;
-    orderDensitiesRef.current = orderDensities;
-    densityLevelRef.current = densityLevel;
     redrawChart();
-  }, [densityLevel, drawings, draftDrawing, orderDensities, toolsEnabled]);
+  }, [drawings, draftDrawing, toolsEnabled]);
 
   useEffect(() => {
     try {
@@ -1820,13 +1730,14 @@ export default function CandleChart({
             </button>
             <button
               type="button"
-              onClick={() => setActiveToolPanel((value) => (value === "do" ? null : "do"))}
-              className={`h-8 transition ${
-                activeToolPanel === "do"
-                  ? "bg-[#c8b6dc] text-black"
-                  : "text-white/75 hover:bg-white/[0.06]"
-              }`}
-              title="Order density"
+              onClick={() => {
+                updateDrawings((prev) => prev.slice(0, -1));
+                resetDraftDrawing();
+                trajectoryLastPointRef.current = null;
+              }}
+              disabled={drawings.length === 0}
+              className="h-8 text-white/75 transition hover:bg-white/[0.06] disabled:pointer-events-none disabled:opacity-35"
+              title="Undo drawing"
             >
               DO
             </button>
@@ -1848,30 +1759,6 @@ export default function CandleChart({
                   {item}
                 </button>
               ))}
-            </div>
-          )}
-
-          {activeToolPanel === "do" && (
-            <div className="border-b border-white/10 bg-[#120817]/78 px-3 py-2 text-left">
-              <div className="mb-1 flex items-center justify-between text-[10px] font-black uppercase text-[#f1c7ff]/70">
-                <span>Density</span>
-                <span className="text-[#c8b6dc]">{densityLevel}</span>
-              </div>
-              <input
-                type="range"
-                min="0"
-                max="999"
-                value={densityLevel}
-                onChange={(event) =>
-                  onDensityLevelChange?.(Number(event.currentTarget.value))
-                }
-                className="density-slider h-3 w-full cursor-pointer appearance-none rounded-full"
-                style={{
-                  background: `linear-gradient(90deg, rgba(200,182,220,0.95) 0%, rgba(209,91,255,0.76) ${
-                    (densityLevel / 999) * 100
-                  }%, rgba(255,255,255,0.08) ${(densityLevel / 999) * 100}%, rgba(255,255,255,0.08) 100%)`,
-                }}
-              />
             </div>
           )}
 
