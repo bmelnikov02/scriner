@@ -1462,13 +1462,21 @@ export default function CandleChart({
     redrawChart();
   }
 
-  function stopTrajectory(event: React.MouseEvent<HTMLDivElement>) {
-    if (drawingTool !== "trajectory") return;
+  function leaveDrawingMode(event: React.MouseEvent<HTMLDivElement>) {
+    if (
+      !toolsEnabledRef.current ||
+      (drawingTool === "cursor" &&
+        !draftDrawingRef.current &&
+        !trajectoryLastPointRef.current)
+    ) {
+      return;
+    }
 
     event.preventDefault();
     event.stopPropagation();
     trajectoryLastPointRef.current = null;
     resetDraftDrawing();
+    setDrawingTool("cursor");
     redrawChart();
   }
 
@@ -1534,6 +1542,7 @@ export default function CandleChart({
       style={{ backgroundColor: CHART_BACKGROUND_COLOR }}
       onPointerMove={updateCursorPrice}
       onPointerLeave={clearCursorPrice}
+      onContextMenu={leaveDrawingMode}
     >
       {!compact && (
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
@@ -1797,7 +1806,7 @@ export default function CandleChart({
         onPointerMove={moveDrawing}
         onPointerUp={finishDrawing}
         onPointerCancel={cancelDrawing}
-        onContextMenu={stopTrajectory}
+        onContextMenu={leaveDrawingMode}
       />
       )}
 
