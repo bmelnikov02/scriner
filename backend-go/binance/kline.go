@@ -15,6 +15,29 @@ import (
 var currentInterval = "1m"
 var intervalMu sync.Mutex
 
+func ToBybitInterval(interval string) string {
+	switch interval {
+	case "1m":
+		return "1"
+	case "5m":
+		return "5"
+	case "15m":
+		return "15"
+	case "1h":
+		return "60"
+	case "4h":
+		return "240"
+	case "1d":
+		return "D"
+	case "1w":
+		return "W"
+	case "1M":
+		return "M"
+	default:
+		return "1"
+	}
+}
+
 func SetInterval(interval string) {
 	intervalMu.Lock()
 	currentInterval = interval
@@ -30,19 +53,25 @@ func GetInterval() string {
 func StartKline() {
 	for {
 		interval := GetInterval()
+		bybitInterval := ToBybitInterval(interval)
 
 		streams := []string{}
 		for _, s := range config.Symbols {
-			streams = append(streams, strings.ToLower(s)+"@kline_"+interval)
+			streams = append(streams, "kline."+bybitInterval+"."+strings.ToUpper(s))
 		}
 
-		url := "wss://fstream.binance.com/stream?streams=" + strings.Join(streams, "/")
+		url := "wss://stream.bybit.com/v5/public/linear"
 
 		conn, _, err := websocket.DefaultDialer.Dial(url, nil)
 		if err != nil {
 			time.Sleep(3 * time.Second)
 			continue
 		}
+
+		conn.WriteJSON(map[string]interface{}{
+			"op":   "subscribe",
+			"args": streams,
+		})
 
 		for {
 			if interval != GetInterval() {
@@ -59,28 +88,32 @@ func StartKline() {
 			var parsed map[string]interface{}
 			json.Unmarshal(msg, &parsed)
 
-			data, ok := parsed["data"].(map[string]interface{})
+			dataList, ok := parsed["data"].([]interface{})
 			if !ok {
 				continue
 			}
 
-			k, ok := data["k"].(map[string]interface{})
-			if !ok {
-				continue
-			}
+			for _, raw := range dataList {
+				k, ok := raw.(map[string]interface{})
+				if !ok {
+					continue
+				}
 
-			ws.Broadcast("candle:update", map[string]interface{}{
-				"symbol":   k["s"],
-				"interval": interval,
-				"candle": map[string]interface{}{
-					"x": k["t"],
-					"o": k["o"],
-					"h": k["h"],
-					"l": k["l"],
-					"c": k["c"],
-					"v": k["v"],
-				},
-			})
+				symbol, _ := k["symbol"].(string)
+
+				ws.Broadcast("candle:update", map[string]interface{}{
+					"symbol":   symbol,
+					"interval": interval,
+					"candle": map[string]interface{}{
+						"x": k["start"],
+						"o": k["open"],
+						"h": k["high"],
+						"l": k["low"],
+						"c": k["close"],
+						"v": k["volume"],
+					},
+				})
+			}
 		}
 	}
 }
