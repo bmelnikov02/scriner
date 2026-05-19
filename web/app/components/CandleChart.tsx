@@ -730,8 +730,39 @@ export default function CandleChart({
         ];
         const angle = Math.atan2(y2 - y1, x2 - x1);
         const headLength = 14;
+        const areaLeft = Math.min(x1, x2);
+        const areaRight = Math.max(x1, x2);
+        const areaTop = Math.min(y1, y2);
+        const areaBottom = Math.max(y1, y2);
+        const areaWidth = areaRight - areaLeft;
+        const areaHeight = areaBottom - areaTop;
 
         ctx.save();
+        ctx.beginPath();
+        ctx.rect(chartArea.left, chartArea.top, chartArea.right - chartArea.left, chartArea.bottom - chartArea.top);
+        ctx.clip();
+
+        ctx.fillStyle = "rgba(200, 182, 220, 0.16)";
+        ctx.strokeStyle = "rgba(209, 91, 255, 0.28)";
+        ctx.lineWidth = 1;
+        ctx.shadowBlur = 0;
+        ctx.setLineDash([]);
+        ctx.beginPath();
+        ctx.rect(areaLeft, areaTop, areaWidth, areaHeight);
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.strokeStyle = "rgba(244, 216, 255, 0.72)";
+        ctx.lineWidth = 1.2;
+        ctx.setLineDash([5, 5]);
+        ctx.beginPath();
+        ctx.moveTo(areaLeft, y2);
+        ctx.lineTo(areaRight, y2);
+        ctx.moveTo(x2, areaTop);
+        ctx.lineTo(x2, areaBottom);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
         ctx.strokeStyle = draft ? DRAWING_ACTIVE_COLOR : DRAWING_LINE_COLOR;
         ctx.fillStyle = draft ? DRAWING_ACTIVE_COLOR : DRAWING_LINE_COLOR;
         ctx.lineWidth = draft ? 2.5 : 2.3;
@@ -762,6 +793,16 @@ export default function CandleChart({
         ctx.closePath();
         ctx.fill();
 
+        ctx.fillStyle = "#06040a";
+        ctx.strokeStyle = "#f4d8ff";
+        ctx.lineWidth = 1.5;
+        ctx.shadowBlur = 7;
+        ctx.shadowColor = DRAWING_LINE_COLOR;
+        ctx.beginPath();
+        ctx.arc(x2, y2, 4.2, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+
         ctx.shadowBlur = 0;
         ctx.font = "800 11px Arial, Helvetica, sans-serif";
         const paddingX = 8;
@@ -772,14 +813,14 @@ export default function CandleChart({
             paddingX * 2
         );
         const labelHeight = paddingY * 2 + labelLines.length * lineHeight;
-        const middleX = (x1 + x2) / 2;
-        const middleY = (y1 + y2) / 2;
+        const preferredLabelX = areaLeft + Math.min(72, Math.max(40, areaWidth * 0.26));
+        const preferredLabelY = areaTop + 8;
         const left = Math.min(
-          Math.max(chartArea.left + 4, middleX - labelWidth / 2),
+          Math.max(chartArea.left + 4, preferredLabelX - labelWidth / 2),
           chartArea.right - labelWidth - 4
         );
         const top = Math.min(
-          Math.max(chartArea.top + 4, middleY - labelHeight - 12),
+          Math.max(chartArea.top + 4, preferredLabelY),
           chartArea.bottom - labelHeight - 4
         );
 
