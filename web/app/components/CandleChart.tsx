@@ -1358,6 +1358,10 @@ export default function CandleChart({
     drawingStartRef.current = null;
   }
 
+  function getActiveDrawingTool() {
+    return draftDrawingRef.current?.tool ?? drawingTool;
+  }
+
   function startDrawing(event: React.PointerEvent<HTMLDivElement>) {
     if (event.button !== 0) return;
 
@@ -1368,14 +1372,20 @@ export default function CandleChart({
     event.preventDefault();
     event.stopPropagation();
 
-    if (drawingTool === "horizontal" || drawingTool === "vertical") {
-      addStraightDrawing(target, drawingTool);
+    const activeTool = event.shiftKey ? "ruler" : drawingTool;
+
+    if (event.shiftKey && drawingTool !== "ruler") {
+      setDrawingTool("ruler");
+    }
+
+    if (activeTool === "horizontal" || activeTool === "vertical") {
+      addStraightDrawing(target, activeTool);
       resetDraftDrawing();
       trajectoryLastPointRef.current = null;
       return;
     }
 
-    if (drawingTool === "trajectory") {
+    if (activeTool === "trajectory") {
       const previousPoint = trajectoryLastPointRef.current;
 
       if (previousPoint) {
@@ -1405,15 +1415,15 @@ export default function CandleChart({
       return;
     }
 
-    if (!isDragDrawingTool(drawingTool)) return;
-    if (drawingTool === "ruler" && !event.shiftKey) return;
+    if (!isDragDrawingTool(activeTool)) return;
+    if (activeTool === "ruler" && !event.shiftKey) return;
 
     event.currentTarget.setPointerCapture(event.pointerId);
     drawingStartRef.current = target;
 
     const draft: Drawing = {
       id: nextDrawingId(),
-      tool: drawingTool,
+      tool: activeTool,
       start: target,
       end: target,
     };
@@ -1428,7 +1438,9 @@ export default function CandleChart({
 
     if (!point) return;
 
-    if (drawingTool === "trajectory") {
+    const activeTool = getActiveDrawingTool();
+
+    if (activeTool === "trajectory") {
       const start = trajectoryLastPointRef.current;
 
       if (!start) return;
@@ -1448,7 +1460,7 @@ export default function CandleChart({
       return;
     }
 
-    if (!isDragDrawingTool(drawingTool)) return;
+    if (!isDragDrawingTool(activeTool)) return;
 
     const start = drawingStartRef.current;
 
@@ -1473,7 +1485,10 @@ export default function CandleChart({
 
   function finishDrawing(event: React.PointerEvent<HTMLDivElement>) {
     if (event.button !== 0) return;
-    if (!isDragDrawingTool(drawingTool)) return;
+
+    const activeTool = getActiveDrawingTool();
+
+    if (!isDragDrawingTool(activeTool)) return;
 
     event.preventDefault();
     event.stopPropagation();
@@ -1490,7 +1505,7 @@ export default function CandleChart({
           ...prev,
           {
             id: nextDrawingId(),
-            tool: drawingTool,
+            tool: activeTool,
             start,
             end: point ?? draftDrawing?.end ?? start,
           },
@@ -1838,7 +1853,7 @@ export default function CandleChart({
       <div
         aria-label="Draw on chart"
         className={`absolute bottom-0 left-0 right-11 top-0 z-40 ${
-          drawingTool === "cursor" ||
+          (drawingTool === "cursor" && !shiftPressed) ||
           (drawingTool === "ruler" && !shiftPressed && !draftDrawing)
             ? "pointer-events-none"
             : "cursor-crosshair touch-none"
