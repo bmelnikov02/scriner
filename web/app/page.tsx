@@ -25,6 +25,16 @@ type Candle = {
   v?: number;
 };
 
+type OrderDensity = {
+  symbol: string;
+  side: "bid" | "ask";
+  price: number;
+  quantity: number;
+  notional: number;
+  score: number;
+  firstSeen: number;
+};
+
 type BinanceTicker = {
   symbol: string;
   lastPrice: string;
@@ -45,6 +55,7 @@ type SavedWorkspace = {
   favorites?: string[];
   gridCount?: number;
   pageIndex?: number;
+  densityLevel?: number;
 };
 
 type WsMessage =
@@ -270,6 +281,9 @@ function getChartColumnCount(count: number) {
 export default function Home() {
   const [rows, setRows] = useState<Record<string, Row>>({});
   const [candles, setCandles] = useState<Record<string, Candle[]>>({});
+  const [orderDensities, setOrderDensities] = useState<
+    Record<string, OrderDensity[]>
+  >({});
   const [allSymbols, setAllSymbols] = useState<string[]>([]);
   const [gridCount, setGridCount] = useState(9);
   const [timeframe, setTimeframe] = useState("1h");
@@ -293,6 +307,7 @@ export default function Home() {
   );
   const [pageIndex, setPageIndex] = useState(0);
   const [coinSortMode, setCoinSortMode] = useState<CoinSortMode>("volume");
+  const [densityLevel, setDensityLevel] = useState(700);
   const [workspaceLoaded, setWorkspaceLoaded] = useState(false);
   const [quickSearchText, setQuickSearchText] = useState("");
   const [quickSearchVisible, setQuickSearchVisible] = useState(false);
@@ -427,6 +442,14 @@ export default function Home() {
         if (typeof saved.pageIndex === "number" && saved.pageIndex >= 0) {
           setPageIndex(saved.pageIndex);
         }
+
+        if (
+          typeof saved.densityLevel === "number" &&
+          saved.densityLevel >= 0 &&
+          saved.densityLevel <= 999
+        ) {
+          setDensityLevel(saved.densityLevel);
+        }
       } catch (error) {
         console.error("Workspace restore error:", error);
       } finally {
@@ -449,6 +472,7 @@ export default function Home() {
       favorites,
       gridCount,
       pageIndex: safePageIndex,
+      densityLevel,
     };
 
     try {
@@ -464,6 +488,7 @@ export default function Home() {
     alertsEnabled,
     coinSortMode,
     drawingsByChart,
+    densityLevel,
     favoriteColors,
     favorites,
     gridCount,
@@ -956,6 +981,55 @@ export default function Home() {
       olderCandlesLoadingRef.current.delete(requestKey);
     }
   }
+
+  async function loadOrderDensities(symbols: string[]) {
+    const uniqueSymbols = Array.from(new Set(symbols)).filter(Boolean);
+
+    if (uniqueSymbols.length === 0) return;
+
+    const results = await Promise.all(
+      uniqueSymbols.map(async (symbol) => {
+        try {
+          const res = await fetch(getApiUrl(`/order-density?symbol=${symbol}`));
+
+          if (!res.ok) {
+            console.error("Order density error:", await res.text());
+            return null;
+          }
+
+          return [symbol, (await res.json()) as OrderDensity[]] as const;
+        } catch (error) {
+          console.error("Load order density error:", error);
+          return null;
+        }
+      })
+    );
+
+    setOrderDensities((prev) => {
+      const next = { ...prev };
+
+      results.forEach((result) => {
+        if (!result) return;
+
+        const [symbol, densities] = result;
+        next[symbol] = densities;
+      });
+
+      return next;
+    });
+  }
+
+  useEffect(() => {
+    const symbols = fullscreenSymbol ? [fullscreenSymbol] : visibleSymbols;
+
+    void loadOrderDensities(symbols);
+
+    const timer = window.setInterval(() => {
+      void loadOrderDensities(symbols);
+    }, 20_000);
+
+    return () => window.clearInterval(timer);
+  }, [fullscreenSymbol, visibleSymbols]);
 
   async function toggleAlerts() {
     const nextEnabled = !alertsEnabled;
@@ -1478,6 +1552,8 @@ export default function Home() {
                       heightClass={chartHeight}
                       compact
                       drawings={drawingsByChart[drawingKey] ?? []}
+                      orderDensities={orderDensities[symbol] ?? []}
+                      densityLevel={densityLevel}
                       onNeedOlderCandles={(oldestTime) =>
                         void loadOlderCandles(symbol, oldestTime)
                       }
@@ -1735,6 +1811,9 @@ export default function Home() {
                 drawingsByChart[getDrawingKey(fullscreenSymbol, timeframe)] ??
                 []
               }
+              orderDensities={orderDensities[fullscreenSymbol] ?? []}
+              densityLevel={densityLevel}
+              onDensityLevelChange={setDensityLevel}
               onDrawingsChange={(nextDrawings) =>
                 updateChartDrawings(fullscreenSymbol, nextDrawings)
               }

@@ -40,6 +40,7 @@ func main() {
 	http.HandleFunc("/timeframe", handlers.Timeframe)
 	http.HandleFunc("/", handlers.Root)
 	http.HandleFunc("/candles", handlers.Candles)
+	http.HandleFunc("/order-density", handlers.OrderDensity)
 	http.HandleFunc("/ws", wsHandler)
 
 	port := os.Getenv("PORT")
