@@ -8,7 +8,7 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: Arial, Helvetica, sans-serif;
+  --font-sans: Helvetica, Arial, sans-serif;
   --font-mono: "Courier New", monospace;
 }
 
@@ -22,7 +22,7 @@ html {
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: Helvetica, Arial, sans-serif;
   height: 100%;
   overflow: hidden;
   overscroll-behavior: none;
@@ -44,4 +44,433 @@ body {
 ::-webkit-scrollbar-thumb {
   background: rgba(245, 189, 18, 0.45);
   border-radius: 999px;
+}
+
+.site-shell {
+  --site-bg: #030608;
+  --site-panel: #080d11;
+  --site-panel-strong: #0b1116;
+  --site-surface: #111116;
+  --site-border: rgba(255, 255, 255, 0.1);
+  --site-muted: rgba(255, 255, 255, 0.55);
+  --site-text: #d9dee5;
+  --site-accent: #c8b6dc;
+  --site-accent-contrast: #030608;
+  background: var(--site-bg) !important;
+  color: var(--site-text) !important;
+}
+
+.site-shell[data-site-style="light"] {
+  --site-bg: #f7f6fb;
+  --site-panel: #ffffff;
+  --site-panel-strong: #f1eff7;
+  --site-surface: #f8f7fc;
+  --site-border: rgba(17, 19, 24, 0.12);
+  --site-muted: rgba(17, 19, 24, 0.54);
+  --site-text: #111318;
+  --site-accent: #a58bc3;
+  --site-accent-contrast: #ffffff;
+}
+
+.site-shell header,
+.site-shell article,
+.site-shell aside,
+.site-shell .settings-popover,
+.site-shell [class*="bg-[#080d11]"],
+.site-shell [class*="bg-[#0b1116]"],
+.site-shell [class*="bg-[#10161c]"],
+.site-shell [class*="bg-[#111116]"] {
+  background-color: var(--site-panel) !important;
+}
+
+.site-shell [class*="bg-[#05090c]"],
+.site-shell [class*="bg-[#030608]"] {
+  background-color: var(--site-bg) !important;
+}
+
+.site-shell [class*="border-white/10"],
+.site-shell [class*="border-[#c8b6dc]"],
+.site-shell [class*="border-[#c8b6dc]/"] {
+  border-color: var(--site-border) !important;
+}
+
+.site-shell [class*="text-[#c8b6dc]"],
+.site-shell [class*="text-white/75"],
+.site-shell [class*="text-white/70"] {
+  color: var(--site-text) !important;
+}
+
+.site-shell [class*="text-white/55"],
+.site-shell [class*="text-white/50"],
+.site-shell [class*="text-white/45"],
+.site-shell [class*="text-white/35"] {
+  color: var(--site-muted) !important;
+}
+
+.site-shell [class~="bg-[#c8b6dc]"] {
+  background-color: color-mix(in srgb, var(--site-accent) 22%, transparent) !important;
+}
+
+.site-shell button:hover {
+  border-color: color-mix(in srgb, var(--site-accent) 48%, transparent) !important;
+}
+
+.site-shell .settings-popover button[class~="bg-[#c8b6dc]"],
+.site-shell .site-style-option[class~="bg-[#c8b6dc]"] {
+  background-color: var(--site-accent) !important;
+  color: var(--site-accent-contrast) !important;
+}
+
+.site-shell .site-style-option[data-style="dark"] {
+  box-shadow: inset 0 0 0 999px rgba(200, 182, 220, 0.08);
+}
+
+.site-shell .site-style-option[data-style="light"] {
+  box-shadow: inset 0 0 0 999px rgba(255, 255, 255, 0.72);
+}
+
+.site-shell[data-site-style="light"] [class*="text-white"] {
+  color: var(--site-text) !important;
+}
+
+.site-shell[data-site-style="light"] [class*="text-white/55"],
+.site-shell[data-site-style="light"] [class*="text-white/50"],
+.site-shell[data-site-style="light"] [class*="text-white/45"],
+.site-shell[data-site-style="light"] [class*="text-white/35"],
+.site-shell[data-site-style="light"] [class*="text-white/30"],
+.site-shell[data-site-style="light"] [class*="text-white/28"],
+.site-shell[data-site-style="light"] [class*="text-white/20"] {
+  color: var(--site-muted) !important;
+}
+
+.site-shell[data-site-style="light"] [class*="bg-black/"],
+.site-shell[data-site-style="light"] [class*="bg-white/["],
+.site-shell[data-site-style="light"] [class*="bg-[#111116]"],
+.site-shell[data-site-style="light"] [class*="bg-[#10161c]"],
+.site-shell[data-site-style="light"] [class*="bg-[#08040d]"],
+.site-shell[data-site-style="light"] [class*="bg-[#061014]"] {
+  background-color: var(--site-surface) !important;
+}
+
+.site-shell[data-site-style="light"] input {
+  color: var(--site-text) !important;
+}
+
+.site-shell[data-site-style="light"] .settings-popover button[class~="bg-[#c8b6dc]"],
+.site-shell[data-site-style="light"] .site-style-option[class~="bg-[#c8b6dc]"],
+.site-shell[data-site-style="light"] button[class~="bg-[#c8b6dc]"] {
+  background-color: var(--site-accent) !important;
+  color: #ffffff !important;
+}
+
+.site-shell .settings-popover.settings-designed {
+  --settings-accent: #a86cff;
+  --settings-accent-soft: rgba(168, 108, 255, 0.22);
+  --settings-line: rgba(178, 119, 255, 0.42);
+  --settings-text: #f4ecff;
+  --settings-muted: rgba(244, 236, 255, 0.72);
+  --settings-card: rgba(84, 49, 145, 0.28);
+  --settings-card-strong: rgba(144, 83, 239, 0.42);
+  background:
+    radial-gradient(circle at 16% 12%, rgba(166, 92, 255, 0.26), transparent 32%),
+    radial-gradient(circle at 82% 78%, rgba(139, 78, 220, 0.38), transparent 36%),
+    linear-gradient(135deg, #1a1231 0%, #171128 48%, #261a47 100%) !important;
+  border: 1px solid var(--settings-line) !important;
+  border-radius: 22px;
+  color: var(--settings-text) !important;
+}
+
+.settings-sidebar,
+.settings-main-panel {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--settings-line);
+  border-radius: 18px;
+  background:
+    radial-gradient(circle at 30% 8%, rgba(181, 116, 255, 0.24), transparent 34%),
+    rgba(22, 15, 42, 0.66);
+  box-shadow:
+    inset 0 0 38px rgba(174, 108, 255, 0.12),
+    0 0 34px rgba(124, 68, 214, 0.12);
+}
+
+.settings-sidebar {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 28px 16px 34px;
+}
+
+.settings-tab-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.settings-tab-button {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  min-height: 58px;
+  border: 0;
+  border-bottom: 1px solid rgba(196, 151, 255, 0.12);
+  padding: 0 18px;
+  color: var(--settings-text);
+  font-size: 18px;
+  font-weight: 500;
+  text-align: left;
+  transition: background-color 240ms ease, color 240ms ease, box-shadow 240ms ease;
+}
+
+.settings-tab-button svg {
+  color: currentColor;
+  filter: drop-shadow(0 0 10px rgba(176, 101, 255, 0.34));
+}
+
+.settings-tab-button:hover,
+.settings-tab-button.is-active {
+  background: linear-gradient(135deg, rgba(147, 83, 255, 0.72), rgba(217, 158, 255, 0.34));
+  box-shadow:
+    inset 0 0 0 1px rgba(223, 188, 255, 0.28),
+    0 0 28px rgba(152, 84, 255, 0.35);
+}
+
+.settings-logo-orb {
+  display: grid;
+  place-items: center;
+  align-self: center;
+  width: 138px;
+  aspect-ratio: 1;
+  border: 2px solid rgba(179, 104, 255, 0.72);
+  border-radius: 999px;
+  color: #d6aaff;
+  font-size: 36px;
+  font-weight: 900;
+  letter-spacing: 0;
+  text-shadow: 0 0 20px rgba(189, 120, 255, 0.72);
+  box-shadow:
+    inset 0 0 34px rgba(156, 91, 244, 0.12),
+    0 0 30px rgba(152, 84, 255, 0.44);
+}
+
+.settings-main-panel {
+  padding: 48px;
+}
+
+.settings-main-inner {
+  position: relative;
+  z-index: 2;
+}
+
+.settings-tab-content {
+  max-width: 760px;
+}
+
+.settings-tab-content h3 {
+  margin: 0 0 30px;
+  color: #bd83ff;
+  font-size: 26px;
+  font-weight: 900;
+  letter-spacing: 0.28em;
+}
+
+.settings-link-card,
+.settings-note,
+.settings-field input,
+.settings-choice,
+.settings-add-menu {
+  border: 1px solid rgba(184, 122, 255, 0.34);
+  border-radius: 14px;
+  background: rgba(41, 27, 74, 0.52);
+  color: var(--settings-text);
+  box-shadow: inset 0 0 24px rgba(172, 105, 255, 0.08);
+}
+
+.settings-link-card {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  min-height: 70px;
+  padding: 0 22px;
+  color: var(--settings-text);
+  font-size: 20px;
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.settings-card-icon {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  aspect-ratio: 1;
+  border-radius: 10px;
+  background: linear-gradient(135deg, rgba(137, 78, 255, 0.92), rgba(201, 131, 255, 0.48));
+  color: #ffffff;
+  box-shadow: 0 0 18px rgba(157, 91, 255, 0.42);
+}
+
+.settings-control-grid,
+.settings-chip-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.settings-chip-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.settings-field {
+  display: grid;
+  gap: 8px;
+  color: var(--settings-muted);
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.settings-field input {
+  height: 50px;
+  padding: 0 16px;
+  color: var(--settings-text);
+  font-size: 16px;
+  font-weight: 800;
+  outline: none;
+}
+
+.settings-choice,
+.settings-add-button,
+.settings-add-menu button {
+  min-height: 52px;
+  padding: 0 16px;
+  font-size: 15px;
+  font-weight: 900;
+  transition: background-color 220ms ease, box-shadow 220ms ease, color 220ms ease;
+}
+
+.settings-choice:hover,
+.settings-choice.is-active,
+.settings-add-button:hover {
+  background: linear-gradient(135deg, rgba(147, 83, 255, 0.76), rgba(218, 166, 255, 0.36));
+  box-shadow: 0 0 22px rgba(157, 91, 255, 0.28);
+  color: #ffffff;
+}
+
+.settings-add-button {
+  display: grid;
+  place-items: center;
+  width: 52px;
+  aspect-ratio: 1;
+  margin-top: 14px;
+  border: 1px solid rgba(184, 122, 255, 0.34);
+  border-radius: 14px;
+  background: rgba(41, 27, 74, 0.52);
+  color: #bd83ff;
+  font-size: 24px;
+  font-weight: 900;
+}
+
+.settings-add-menu {
+  position: absolute;
+  left: 0;
+  top: 74px;
+  z-index: 4;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  width: 220px;
+  padding: 10px;
+  backdrop-filter: blur(12px);
+}
+
+.settings-note {
+  margin-top: 16px;
+  padding: 16px 18px;
+  color: var(--settings-muted);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.settings-wave-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.settings-wave-layer::before,
+.settings-wave-layer::after {
+  content: "";
+  position: absolute;
+  right: -12%;
+  bottom: -18%;
+  width: 88%;
+  height: 58%;
+  border-radius: 50%;
+  background:
+    linear-gradient(18deg, transparent 18%, rgba(189, 118, 255, 0.18) 19%, transparent 22%),
+    linear-gradient(165deg, transparent 28%, rgba(202, 148, 255, 0.34) 29%, transparent 34%),
+    linear-gradient(9deg, transparent 38%, rgba(148, 83, 238, 0.42) 40%, transparent 50%);
+  filter: blur(0.2px);
+  transform: rotate(-11deg);
+}
+
+.settings-wave-layer::after {
+  right: -2%;
+  bottom: -5%;
+  opacity: 0.55;
+  transform: rotate(-22deg) scale(1.18);
+}
+
+.site-shell[data-site-style="light"] .settings-popover.settings-designed {
+  --settings-accent: #8b5cf6;
+  --settings-accent-soft: rgba(153, 103, 255, 0.16);
+  --settings-line: rgba(177, 139, 255, 0.24);
+  --settings-text: #1f1b33;
+  --settings-muted: rgba(31, 27, 51, 0.64);
+  --settings-card: rgba(255, 255, 255, 0.56);
+  --settings-card-strong: rgba(227, 206, 255, 0.72);
+  background:
+    radial-gradient(circle at 18% 8%, rgba(174, 126, 255, 0.14), transparent 34%),
+    radial-gradient(circle at 76% 64%, rgba(194, 151, 255, 0.24), transparent 34%),
+    linear-gradient(135deg, #fff 0%, #fbf8ff 52%, #f1eaff 100%) !important;
+  color: var(--settings-text) !important;
+}
+
+.site-shell[data-site-style="light"] .settings-sidebar,
+.site-shell[data-site-style="light"] .settings-main-panel {
+  background:
+    radial-gradient(circle at 38% 10%, rgba(184, 138, 255, 0.12), transparent 34%),
+    rgba(255, 255, 255, 0.66);
+}
+
+.site-shell[data-site-style="light"] .settings-tab-button {
+  color: var(--settings-text);
+  border-bottom-color: rgba(108, 91, 150, 0.1);
+}
+
+.site-shell[data-site-style="light"] .settings-tab-button:hover,
+.site-shell[data-site-style="light"] .settings-tab-button.is-active,
+.site-shell[data-site-style="light"] .settings-choice:hover,
+.site-shell[data-site-style="light"] .settings-choice.is-active,
+.site-shell[data-site-style="light"] .settings-add-button:hover {
+  background: linear-gradient(135deg, rgba(157, 104, 247, 0.24), rgba(232, 206, 255, 0.68));
+  color: #8b5cf6;
+}
+
+.site-shell[data-site-style="light"] .settings-link-card,
+.site-shell[data-site-style="light"] .settings-note,
+.site-shell[data-site-style="light"] .settings-field input,
+.site-shell[data-site-style="light"] .settings-choice,
+.site-shell[data-site-style="light"] .settings-add-button,
+.site-shell[data-site-style="light"] .settings-add-menu {
+  background: rgba(255, 255, 255, 0.58);
+  color: var(--settings-text);
+}
+
+.site-shell[data-site-style="light"] .settings-logo-orb {
+  color: #8b5cf6;
+  text-shadow: 0 0 20px rgba(161, 105, 255, 0.36);
+  box-shadow:
+    inset 0 0 24px rgba(161, 105, 255, 0.06),
+    0 0 20px rgba(161, 105, 255, 0.24);
 }

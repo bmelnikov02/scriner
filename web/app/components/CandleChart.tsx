@@ -40,6 +40,7 @@ type Props = {
   candles: Candle[];
   heightClass?: string;
   timeframe?: string;
+  theme?: "dark" | "light";
   compact?: boolean;
   showTools?: boolean;
   timeframeControls?: {
@@ -98,6 +99,8 @@ type Drawing = {
   tool: Exclude<DrawingTool, "cursor">;
   start: DrawingPoint;
   end: DrawingPoint;
+  color?: string;
+  groupId?: string;
 };
 
 export type ChartDrawing = Drawing;
@@ -126,6 +129,13 @@ type DrawingTarget = DrawingPoint & {
 type DrawingPanelItem =
   | { kind: "tool"; tool: DrawingTool; title: string }
   | { kind: "clear"; id: "clear"; title: string };
+
+type DrawingColorMenu = {
+  drawingId: string;
+  tool: Exclude<DrawingTool, "cursor">;
+  x: number;
+  y: number;
+};
 
 const DRAWING_PANEL_ITEMS: DrawingPanelItem[] = [
   { kind: "tool", tool: "cursor", title: "Cursor" },
@@ -173,6 +183,19 @@ const DRAWING_FAVORITES_STORAGE_KEY = "scriner-drawing-tool-favorites-v1";
 const DRAWING_LINE_COLOR = "#d15bff";
 const DRAWING_ACTIVE_COLOR = "#ff74d6";
 const DRAWING_FILL_COLOR = "rgba(255, 79, 216, 0.16)";
+const CHART_FONT_FAMILY = "Helvetica, Arial, sans-serif";
+const DRAWING_RAINBOW_COLORS = [
+  "#ff1744",
+  "#ff9100",
+  "#ffea00",
+  "#00e676",
+  "#00e5ff",
+  "#2979ff",
+  "#651fff",
+  "#d500f9",
+];
+const RULER_ICON_SRC =
+  "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAGAAAABgCAYAAADimHc4AAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAAViSURBVHhe7Zzfb1RFFMf76J/AgzE8aPTFH4kan0x4MBF9MWJCjGA0IgUSiBoSDI2CCAbTRG1IsYFoWxuxYo1FrDZEGo0/aGxjCrFNaQ1di2C7PwqulAJrd45zZu+0s7Pn7r2Lu33p95OchOyd3dt8zt1zZu/coQ4AAAAAAAAAAAAAAAAAAAAAAAAAAADwv1Ap9bSaUW0qo4Z0jOroVGm1OTgMagVdppVadi9liKTQSeinNN0VDAfVhJJ0nxZ8WRLvhhmjxwZvA9VAkj/7K9Glb4lmThBdGdDiU0hCTfDlq2miRFeWJjqu0nQXLUSmt3CskACia7/nr8yeVquDjwE3gyR/4miW1q7cSuvveIUGm86XJCE/RXTjHNH1s0Rzo/lZNakeCD4OVIIknwVf6MzRxnsaaM2tm0qSMKUj1aOv/hGdgPHCe1COboIw+Vb0yOFMSRJYPgcfT+sk5C8U3mvejyTEJ0q+lIRn79xOZ95PFo59Xjju9gTzORmVoATdEpwGSMSVb4OTUH/va7T94UZ6+4lW+u1Quuh4SRJm1HvBqYCPJH/o8Hn6ZOtJU/ddsTa45Iy1/k3vrv2Ydj3aTBvv3klnmqeKxmR/chKQUVPB6YBL2JW/57EWU2Jef+RASRLcmj/e/g9te/BNM/bQc91F4zjcb4E+14rgtIApV3Z6GgaMVD8Jrnxb88dbs/Thhq9MWTKvOzHvNGQ+X3BqUE6+jWM7ThUl4U+dBF9+uUh9uShfl6BraMQBceTbsEl46rYtdHB9F108Oh9LPscN/Xtg4Rxp1R+cfnlTiXwbx17tN7Md7gsfbDhOF0Masxtzw4vyTaRpVfAnLF8k+QMHJ+ilh/bRR5t7RZG25v+w/6yZ7ay7/WWxMbvhy8cUVBN25bt1nhupK9JvuD07fynqCVISBPltwZ+wfIkqO41r2kuS4Mu3Y/3G7CYB8gXi1vyiJLzYI8q34Sahed1n5jXIF6i04XISeLbDDffrhsGysx1OAt+M4x9fkC8gyef7+f5iiht81bfVf2NmO9xwOzbJjdkNyBeQ5E8fz5krVlpM4XBr/pFtJ81sh0uMf3/HDcgXKFd2tty/20iVFlP8ms+1naenfJvBjnMD8gWian7UYkq5mu8G5AvEbbhRiylRAfkCceXbiFpMCQvIF5Dkn2oaM7cWwmY8XHL8xRSpMbsB+QJhV75dTOEm6ifBrfnuYkrY7IgD8gXKlZ0f94+Z53f8JEgNV2rM5ngQkC8Qp+b37R0uSsI5nQRfvg0/CXbuD/kClTRcmwS+vdD4ZDtNHrkeOttxk8C3GSBfoBL5Nvr2jtCOVe+YvnDgmU8p0TEnjuPgUsXlC/IFJPlxF1MGmyZpz+Mt5vYCJ0IaawPyBXjjg3Tln9g1ZEoGR9RiyvdvjZpyxGXGHecG5IegMuo7X76VVsliCt/XCfttAPkhaBnPu2J4U4Qvr5LFFCkgvwz66u+2YnhniiSQo5LFFDcgPwLzZHEgp9yMh696LKbUALf58rP3kki35ruLKTyl9MfagPyY6G/AwtbQ7M+lIl35tuzwOi0/sYDFlCqgp6BvLIjSMyB+3tKKlORHBeRXCD/Q6vaBf/8gSnZD/pKikmq1Ky6X0EK/CMRC/tKgpZnfA7wPl7eCXj2txepvgiTbD8ivEvMp9YLdh8tbQXP631yOJOk2IL/KzA2r3XYfLgu1PQHyl5D5aap3xeb/IrrUtyieZ0ru5ggOyK8yWmrRPSIO3o+Vmyh+jQPya4T5z5OcX8pS6ClsSzAc1AJK0gotuVMQP8rT12AYWAp41Yz3YmE3IgAAAAAAAAAAAAAAAAAAAAAAAACqQF3df0MiLg1i7rV+AAAAAElFTkSuQmCC";
 const LOGO_COLOR = "#c8b6dc";
 const CURRENT_PRICE_LINE_COLOR = LOGO_COLOR;
 const CHART_BACKGROUND_COLOR = "#111116";
@@ -181,6 +204,10 @@ const CHART_GRID_STRONG_COLOR = "rgba(255,255,255,0.095)";
 const CANDLE_UP_COLOR = "#089981";
 const CANDLE_DOWN_COLOR = "#f23645";
 const CANDLE_UNCHANGED_COLOR = "#d1a83a";
+const Y_SCALE_DRAG_SENSITIVITY = 0.0025;
+const PAST_SCROLL_PADDING_BARS = 120;
+const COMPACT_VISIBLE_FUTURE_BARS = 50;
+const FULLSCREEN_FUTURE_BARS = 200;
 
 function formatLinePrice(value: number) {
   if (value >= 100) return value.toFixed(1);
@@ -202,6 +229,21 @@ function getTickPrecision(step: number) {
 
 function formatAxisPrice(value: number, step: number) {
   return value.toFixed(getTickPrecision(step));
+}
+
+function hexToRgba(hex: string, alpha: number) {
+  const value = hex.replace("#", "");
+  const parsed = Number.parseInt(value, 16);
+
+  if (value.length !== 6 || Number.isNaN(parsed)) {
+    return `rgba(209, 91, 255, ${alpha})`;
+  }
+
+  const red = (parsed >> 16) & 255;
+  const green = (parsed >> 8) & 255;
+  const blue = parsed & 255;
+
+  return `rgba(${red}, ${green}, ${blue}, ${alpha})`;
 }
 
 function getRecentCandleSpacing(candles: Candle[]) {
@@ -251,6 +293,28 @@ function formatRulerDuration(ms: number) {
   return parts.length ? parts.join(" ") : "0м";
 }
 
+function getRulerPercentDiff(startPrice: number, endPrice: number) {
+  if (
+    !Number.isFinite(startPrice) ||
+    !Number.isFinite(endPrice) ||
+    startPrice <= 0
+  ) {
+    return 0;
+  }
+
+  const rawPercent = ((endPrice - startPrice) / startPrice) * 100;
+
+  if (!Number.isFinite(rawPercent)) return 0;
+
+  return rawPercent < 0 ? Math.max(rawPercent, -100) : rawPercent;
+}
+
+function formatRulerPercent(value: number) {
+  const normalized = Math.abs(value) < 0.005 ? 0 : value;
+
+  return `${normalized > 0 ? "+" : ""}${normalized.toFixed(2)}%`;
+}
+
 function formatBarCount(value: number) {
   return `${value} бар${value === 1 ? "" : "ов"}`;
 }
@@ -278,15 +342,10 @@ function DrawingPanelIcon({
   item,
   active,
 }: {
-  item: DrawingPanelItem;
+  item: DrawingPanelItem & { color?: string };
   active: boolean;
 }) {
-  const color =
-    item.kind === "tool" && item.tool === "cursor"
-      ? LOGO_COLOR
-      : active
-        ? "#ffffff"
-        : "#e7a8ff";
+  const color = item.color ?? (active ? "#6b7280" : "#9ca3af");
 
   if (item.kind === "clear") {
     return (
@@ -316,7 +375,7 @@ function DrawingPanelIcon({
         <path
           d="M16 13.7V18.3M13.7 16H18.3"
           fill="none"
-          stroke="#b56cff"
+          stroke="#9ca3af"
           strokeLinecap="round"
           strokeWidth="2"
         />
@@ -332,7 +391,7 @@ function DrawingPanelIcon({
           y="6"
           width="14"
           height="12"
-          fill="rgba(255,79,216,0.16)"
+          fill="rgba(156,163,175,0.12)"
           stroke={color}
           strokeWidth="1.8"
         />
@@ -342,22 +401,17 @@ function DrawingPanelIcon({
 
   if (item.tool === "ruler") {
     return (
-      <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden="true">
-        <path
-          d="M5 18L18 5"
-          fill="none"
-          stroke={color}
-          strokeLinecap="round"
-          strokeWidth="2"
-        />
-        <path
-          d="M7 16L9 18M10 13L12 15M13 10L15 12M16 7L18 9"
-          fill="none"
-          stroke={color}
-          strokeLinecap="round"
-          strokeWidth="1.4"
-        />
-      </svg>
+      <span
+        className="h-7 w-7"
+        style={{
+          backgroundImage: `url(${RULER_ICON_SRC})`,
+          backgroundPosition: "center",
+          backgroundRepeat: "no-repeat",
+          backgroundSize: "contain",
+          filter: "grayscale(1) opacity(0.72)",
+        }}
+        aria-hidden="true"
+      />
     );
   }
 
@@ -366,7 +420,7 @@ function DrawingPanelIcon({
       <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden="true">
         <path
           d="M12 5L20 19H4Z"
-          fill="rgba(255,79,216,0.16)"
+          fill="rgba(156,163,175,0.12)"
           stroke={color}
           strokeLinejoin="round"
           strokeWidth="1.8"
@@ -437,6 +491,7 @@ export default function CandleChart({
   candles,
   heightClass = "h-[300px]",
   timeframe = "1m",
+  theme = "dark",
   compact = false,
   showTools = false,
   timeframeControls,
@@ -449,10 +504,16 @@ export default function CandleChart({
   const drawingStartRef = useRef<DrawingPoint | null>(null);
   const drawingIdRef = useRef(0);
   const cursorPriceRef = useRef<number | null>(null);
+  const drawFrameRef = useRef<number | null>(null);
+  const cursorDrawFrameRef = useRef<number | null>(null);
+  const chartUpdateFrameRef = useRef<number | null>(null);
   const drawingsRef = useRef<Drawing[]>([]);
   const draftDrawingRef = useRef<Drawing | null>(null);
   const toolsEnabledRef = useRef(false);
-  const trajectoryLastPointRef = useRef<DrawingPoint | null>(null);
+  const trajectoryLastPointRef = useRef<{
+    point: DrawingPoint;
+    groupId: string;
+  } | null>(null);
   const olderCandlesRequestRef = useRef<{
     oldestTime: number;
     requestedAt: number;
@@ -498,7 +559,7 @@ export default function CandleChart({
         ctx.shadowColor = CURRENT_PRICE_LINE_COLOR;
         ctx.stroke();
 
-        ctx.font = "700 10px Arial, Helvetica, sans-serif";
+        ctx.font = `700 10px ${CHART_FONT_FAMILY}`;
         const paddingX = 5;
         const labelHeight = 16;
         const labelWidth = Math.ceil(ctx.measureText(text).width + paddingX * 2);
@@ -566,7 +627,7 @@ export default function CandleChart({
         ctx.stroke();
 
         ctx.fillStyle = "#d8fff5";
-        ctx.font = "700 10px Arial, Helvetica, sans-serif";
+        ctx.font = `700 10px ${CHART_FONT_FAMILY}`;
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
         ctx.fillText(text, x + labelWidth / 2, labelY + labelHeight / 2);
@@ -577,7 +638,8 @@ export default function CandleChart({
         y1: number,
         x2: number,
         y2: number,
-        draft: boolean
+        draft: boolean,
+        color?: string
       ) => {
         if (
           !Number.isFinite(x1) ||
@@ -588,15 +650,17 @@ export default function CandleChart({
           return;
         }
 
+        const strokeColor = color ?? (draft ? DRAWING_ACTIVE_COLOR : DRAWING_LINE_COLOR);
+
         ctx.save();
         ctx.beginPath();
         ctx.moveTo(x1, y1);
         ctx.lineTo(x2, y2);
         ctx.lineWidth = draft ? 2.5 : 3;
-        ctx.strokeStyle = DRAWING_LINE_COLOR;
+        ctx.strokeStyle = strokeColor;
         ctx.lineCap = "round";
         ctx.shadowBlur = 9;
-        ctx.shadowColor = DRAWING_LINE_COLOR;
+        ctx.shadowColor = strokeColor;
 
         if (draft) {
           ctx.setLineDash([7, 5]);
@@ -605,13 +669,15 @@ export default function CandleChart({
         ctx.stroke();
         ctx.restore();
       };
-      const drawHorizontalLabel = (y: number, price: number, draft: boolean) => {
+      const drawHorizontalLabel = (y: number, price: number, draft: boolean, color?: string) => {
         if (!Number.isFinite(y) || !Number.isFinite(price)) return;
 
         const text = `${symbol.replace("USDT", "")} ${formatLinePrice(price)}`;
 
+        const strokeColor = color ?? (draft ? DRAWING_ACTIVE_COLOR : DRAWING_LINE_COLOR);
+
         ctx.save();
-        ctx.font = "700 11px Arial, Helvetica, sans-serif";
+        ctx.font = `700 11px ${CHART_FONT_FAMILY}`;
         const paddingX = 6;
         const labelHeight = 20;
         const labelWidth = Math.ceil(ctx.measureText(text).width + paddingX * 2);
@@ -622,9 +688,9 @@ export default function CandleChart({
         );
 
         ctx.shadowBlur = draft ? 10 : 7;
-        ctx.shadowColor = DRAWING_LINE_COLOR;
+        ctx.shadowColor = strokeColor;
         ctx.fillStyle = draft ? "rgba(255,79,216,0.24)" : "rgba(12,6,18,0.92)";
-        ctx.strokeStyle = DRAWING_LINE_COLOR;
+        ctx.strokeStyle = strokeColor;
         ctx.lineWidth = 1;
         ctx.beginPath();
         ctx.roundRect(x, labelY, labelWidth, labelHeight, 5);
@@ -643,7 +709,8 @@ export default function CandleChart({
         y1: number,
         x2: number,
         y2: number,
-        draft: boolean
+        draft: boolean,
+        color?: string
       ) => {
         if (
           !Number.isFinite(x1) ||
@@ -658,13 +725,14 @@ export default function CandleChart({
         const top = Math.min(y1, y2);
         const width = Math.abs(x2 - x1);
         const height = Math.abs(y2 - y1);
+        const strokeColor = color ?? (draft ? DRAWING_ACTIVE_COLOR : DRAWING_LINE_COLOR);
 
         ctx.save();
-        ctx.fillStyle = DRAWING_FILL_COLOR;
-        ctx.strokeStyle = draft ? DRAWING_ACTIVE_COLOR : DRAWING_LINE_COLOR;
+        ctx.fillStyle = color ? hexToRgba(color, 0.18) : DRAWING_FILL_COLOR;
+        ctx.strokeStyle = strokeColor;
         ctx.lineWidth = draft ? 2.2 : 2;
         ctx.shadowBlur = 8;
-        ctx.shadowColor = DRAWING_LINE_COLOR;
+        ctx.shadowColor = strokeColor;
 
         if (draft) {
           ctx.setLineDash([7, 5]);
@@ -681,7 +749,8 @@ export default function CandleChart({
         y1: number,
         x2: number,
         y2: number,
-        draft: boolean
+        draft: boolean,
+        color?: string
       ) => {
         if (
           !Number.isFinite(x1) ||
@@ -698,13 +767,15 @@ export default function CandleChart({
         const bottom = Math.max(y1, y2);
         const centerX = left + (right - left) / 2;
 
+        const strokeColor = color ?? (draft ? DRAWING_ACTIVE_COLOR : DRAWING_LINE_COLOR);
+
         ctx.save();
-        ctx.fillStyle = DRAWING_FILL_COLOR;
-        ctx.strokeStyle = draft ? DRAWING_ACTIVE_COLOR : DRAWING_LINE_COLOR;
+        ctx.fillStyle = color ? hexToRgba(color, 0.18) : DRAWING_FILL_COLOR;
+        ctx.strokeStyle = strokeColor;
         ctx.lineWidth = draft ? 2.2 : 2;
         ctx.lineJoin = "round";
         ctx.shadowBlur = 8;
-        ctx.shadowColor = DRAWING_LINE_COLOR;
+        ctx.shadowColor = strokeColor;
 
         if (draft) {
           ctx.setLineDash([7, 5]);
@@ -737,21 +808,19 @@ export default function CandleChart({
           return;
         }
 
-        const priceDiff = end.y - start.y;
-        const percentDiff = start.y !== 0 ? (priceDiff / start.y) * 100 : 0;
+        const percentDiff = getRulerPercentDiff(start.y, end.y);
         const timeframeMs = getTimeframeMs(timeframe) ?? getRecentCandleSpacing(candles);
         const barCount = Math.max(
           0,
           Math.round(Math.abs(end.x - start.x) / Math.max(1, timeframeMs))
         );
         const elapsedMs = barCount * timeframeMs;
-        const labelLines = [
-          `${percentDiff >= 0 ? "+" : ""}${percentDiff.toFixed(2)}%`,
-          formatBarCount(barCount),
-          formatRulerDuration(elapsedMs),
-        ];
-        const angle = Math.atan2(y2 - y1, x2 - x1);
-        const headLength = 14;
+        const accent = percentDiff >= 0 ? "#22ab94" : "#f23645";
+        const accentSoft = percentDiff >= 0 ? "rgba(34,171,148,0.14)" : "rgba(242,54,69,0.14)";
+        const accentLine = percentDiff >= 0 ? "rgba(34,171,148,0.72)" : "rgba(242,54,69,0.72)";
+        const labelText = `${formatRulerPercent(percentDiff)}  ${formatBarCount(
+          barCount
+        )}  ${formatRulerDuration(elapsedMs)}`;
         const areaLeft = Math.min(x1, x2);
         const areaRight = Math.max(x1, x2);
         const areaTop = Math.min(y1, y2);
@@ -764,8 +833,8 @@ export default function CandleChart({
         ctx.rect(chartArea.left, chartArea.top, chartArea.right - chartArea.left, chartArea.bottom - chartArea.top);
         ctx.clip();
 
-        ctx.fillStyle = "rgba(200, 182, 220, 0.16)";
-        ctx.strokeStyle = "rgba(209, 91, 255, 0.28)";
+        ctx.fillStyle = accentSoft;
+        ctx.strokeStyle = accentLine;
         ctx.lineWidth = 1;
         ctx.shadowBlur = 0;
         ctx.setLineDash([]);
@@ -774,27 +843,31 @@ export default function CandleChart({
         ctx.fill();
         ctx.stroke();
 
-        ctx.strokeStyle = "rgba(244, 216, 255, 0.72)";
-        ctx.lineWidth = 1.2;
-        ctx.setLineDash([5, 5]);
+        ctx.strokeStyle = "rgba(231,238,247,0.45)";
+        ctx.lineWidth = 1;
+        ctx.setLineDash([4, 4]);
         ctx.beginPath();
+        ctx.moveTo(areaLeft, y1);
+        ctx.lineTo(areaRight, y1);
         ctx.moveTo(areaLeft, y2);
         ctx.lineTo(areaRight, y2);
+        ctx.moveTo(x1, areaTop);
+        ctx.lineTo(x1, areaBottom);
         ctx.moveTo(x2, areaTop);
         ctx.lineTo(x2, areaBottom);
         ctx.stroke();
         ctx.setLineDash([]);
 
-        ctx.strokeStyle = draft ? DRAWING_ACTIVE_COLOR : DRAWING_LINE_COLOR;
-        ctx.fillStyle = draft ? DRAWING_ACTIVE_COLOR : DRAWING_LINE_COLOR;
-        ctx.lineWidth = draft ? 2.5 : 2.3;
+        ctx.strokeStyle = accent;
+        ctx.fillStyle = accent;
+        ctx.lineWidth = draft ? 2.4 : 2;
         ctx.lineCap = "round";
         ctx.lineJoin = "round";
-        ctx.shadowBlur = 8;
-        ctx.shadowColor = DRAWING_LINE_COLOR;
+        ctx.shadowBlur = 10;
+        ctx.shadowColor = accent;
 
         if (draft) {
-          ctx.setLineDash([7, 5]);
+          ctx.setLineDash([6, 4]);
         }
 
         ctx.beginPath();
@@ -802,40 +875,23 @@ export default function CandleChart({
         ctx.lineTo(x2, y2);
         ctx.stroke();
         ctx.setLineDash([]);
-        ctx.beginPath();
-        ctx.moveTo(x2, y2);
-        ctx.lineTo(
-          x2 - headLength * Math.cos(angle - Math.PI / 6),
-          y2 - headLength * Math.sin(angle - Math.PI / 6)
-        );
-        ctx.lineTo(
-          x2 - headLength * Math.cos(angle + Math.PI / 6),
-          y2 - headLength * Math.sin(angle + Math.PI / 6)
-        );
-        ctx.closePath();
-        ctx.fill();
 
-        ctx.fillStyle = "#06040a";
-        ctx.strokeStyle = "#f4d8ff";
-        ctx.lineWidth = 1.5;
-        ctx.shadowBlur = 7;
-        ctx.shadowColor = DRAWING_LINE_COLOR;
-        ctx.beginPath();
-        ctx.arc(x2, y2, 4.2, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.stroke();
+        [ [x1, y1], [x2, y2] ].forEach(([pointX, pointY]) => {
+          ctx.beginPath();
+          ctx.fillStyle = "#0b1116";
+          ctx.strokeStyle = accent;
+          ctx.lineWidth = 2;
+          ctx.arc(pointX, pointY, 4.6, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.stroke();
+        });
 
         ctx.shadowBlur = 0;
-        ctx.font = "800 11px Arial, Helvetica, sans-serif";
+        ctx.font = `800 11px ${CHART_FONT_FAMILY}`;
         const paddingX = 8;
-        const paddingY = 6;
-        const lineHeight = 13;
-        const labelWidth = Math.ceil(
-          Math.max(...labelLines.map((line) => ctx.measureText(line).width)) +
-            paddingX * 2
-        );
-        const labelHeight = paddingY * 2 + labelLines.length * lineHeight;
-        const preferredLabelX = areaLeft + Math.min(72, Math.max(40, areaWidth * 0.26));
+        const labelHeight = 22;
+        const labelWidth = Math.ceil(ctx.measureText(labelText).width + paddingX * 2);
+        const preferredLabelX = areaLeft + Math.min(96, Math.max(52, areaWidth * 0.35));
         const preferredLabelY = areaTop + 8;
         const left = Math.min(
           Math.max(chartArea.left + 4, preferredLabelX - labelWidth / 2),
@@ -846,20 +902,18 @@ export default function CandleChart({
           chartArea.bottom - labelHeight - 4
         );
 
-        ctx.fillStyle = "rgba(12,6,18,0.92)";
-        ctx.strokeStyle = DRAWING_LINE_COLOR;
+        ctx.fillStyle = "rgba(8,13,17,0.96)";
+        ctx.strokeStyle = accent;
         ctx.lineWidth = 1;
         ctx.beginPath();
         ctx.roundRect(left, top, labelWidth, labelHeight, 4);
         ctx.fill();
         ctx.stroke();
 
-        ctx.fillStyle = "#f4d8ff";
+        ctx.fillStyle = accent;
         ctx.textAlign = "center";
-        ctx.textBaseline = "top";
-        labelLines.forEach((line, index) => {
-          ctx.fillText(line, left + labelWidth / 2, top + paddingY + index * lineHeight);
-        });
+        ctx.textBaseline = "middle";
+        ctx.fillText(labelText, left + labelWidth / 2, top + labelHeight / 2);
         ctx.restore();
       };
       const drawArrow = (
@@ -867,7 +921,8 @@ export default function CandleChart({
         y1: number,
         x2: number,
         y2: number,
-        draft: boolean
+        draft: boolean,
+        color?: string
       ) => {
         if (
           !Number.isFinite(x1) ||
@@ -881,14 +936,16 @@ export default function CandleChart({
         const angle = Math.atan2(y2 - y1, x2 - x1);
         const headLength = 14;
 
+        const strokeColor = color ?? (draft ? DRAWING_ACTIVE_COLOR : DRAWING_LINE_COLOR);
+
         ctx.save();
-        ctx.strokeStyle = draft ? DRAWING_ACTIVE_COLOR : DRAWING_LINE_COLOR;
-        ctx.fillStyle = draft ? DRAWING_ACTIVE_COLOR : DRAWING_LINE_COLOR;
+        ctx.strokeStyle = strokeColor;
+        ctx.fillStyle = strokeColor;
         ctx.lineWidth = draft ? 2.5 : 3;
         ctx.lineCap = "round";
         ctx.lineJoin = "round";
         ctx.shadowBlur = 9;
-        ctx.shadowColor = DRAWING_LINE_COLOR;
+        ctx.shadowColor = strokeColor;
 
         if (draft) {
           ctx.setLineDash([7, 5]);
@@ -926,13 +983,13 @@ export default function CandleChart({
         const draft = item.id === currentDraft?.id;
 
         if (item.tool === "horizontal") {
-          drawLine(chartArea.left, startY, chartArea.right, startY, draft);
-          drawHorizontalLabel(startY, item.start.y, draft);
+          drawLine(chartArea.left, startY, chartArea.right, startY, draft, item.color);
+          drawHorizontalLabel(startY, item.start.y, draft, item.color);
           return;
         }
 
         if (item.tool === "vertical") {
-          drawLine(startX, chartArea.top, startX, chartArea.bottom, draft);
+          drawLine(startX, chartArea.top, startX, chartArea.bottom, draft, item.color);
           return;
         }
 
@@ -940,12 +997,12 @@ export default function CandleChart({
         const endY = yScale.getPixelForValue(item.end.y);
 
         if (item.tool === "rectangle") {
-          drawRectangle(startX, startY, endX, endY, draft);
+          drawRectangle(startX, startY, endX, endY, draft, item.color);
           return;
         }
 
         if (item.tool === "triangle") {
-          drawTriangle(startX, startY, endX, endY, draft);
+          drawTriangle(startX, startY, endX, endY, draft, item.color);
           return;
         }
 
@@ -978,11 +1035,11 @@ export default function CandleChart({
             arrowEndY = Math.max(startY + 12, endY);
           }
 
-          drawArrow(startX, startY, arrowEndX, arrowEndY, draft);
+          drawArrow(startX, startY, arrowEndX, arrowEndY, draft, item.color);
           return;
         }
 
-        drawLine(startX, startY, endX, endY, draft);
+        drawLine(startX, startY, endX, endY, draft, item.color);
       });
 
       drawCurrentPriceLine();
@@ -998,6 +1055,10 @@ export default function CandleChart({
   const [drawingWindowStart, setDrawingWindowStart] = useState(0);
   const [localDrawings, setLocalDrawings] = useState<Drawing[]>([]);
   const [draftDrawing, setDraftDrawing] = useState<Drawing | null>(null);
+  const [drawingColorMenu, setDrawingColorMenu] =
+    useState<DrawingColorMenu | null>(null);
+  const [selectedDrawingColor, setSelectedDrawingColor] =
+    useState(DRAWING_LINE_COLOR);
   const [shiftPressed, setShiftPressed] = useState(false);
   const [favoriteDrawingTools, setFavoriteDrawingTools] = useState<DrawingTool[]>(
     []
@@ -1062,18 +1123,62 @@ export default function CandleChart({
     1,
     ...volumeCandles.map((candle) => Number(candle.v ?? 0))
   );
+  const volumeRenderLimit = compact ? 180 : 420;
+  const volumeRenderStep = Math.max(
+    1,
+    Math.ceil(volumeCandles.length / volumeRenderLimit)
+  );
+  const renderedVolumeCandles =
+    volumeRenderStep === 1
+      ? volumeCandles
+      : volumeCandles.filter(
+          (_, index) =>
+            index % volumeRenderStep === 0 || index === volumeCandles.length - 1
+        );
   const oldestCandleTime = candles[0]?.x;
   const newestCandleTime = candles.at(-1)?.x;
   const candleSpacing = getRecentCandleSpacing(candles);
-  const rightCandlePadding = candleSpacing * (compact ? 5 : 8);
+  const futureBars = compact ? COMPACT_VISIBLE_FUTURE_BARS : FULLSCREEN_FUTURE_BARS;
+  const rightCandlePadding = candleSpacing * futureBars;
   const newestVisibleTime =
     newestCandleTime !== undefined ? newestCandleTime + rightCandlePadding : undefined;
+  const oldestScrollableTime =
+    oldestCandleTime !== undefined
+      ? oldestCandleTime - candleSpacing * PAST_SCROLL_PADDING_BARS
+      : undefined;
+  const newestScrollableTime =
+    newestCandleTime !== undefined
+      ? newestCandleTime + candleSpacing * futureBars
+      : undefined;
+  const rightWallTime = newestScrollableTime;
   const loadedXRange =
     oldestCandleTime !== undefined &&
     newestVisibleTime !== undefined &&
     newestVisibleTime > oldestCandleTime
       ? newestVisibleTime - oldestCandleTime
       : 0;
+  const chartTheme =
+    theme === "light"
+      ? {
+          background: "#ffffff",
+          grid: "rgba(17, 19, 24, 0.1)",
+          gridStrong: "rgba(17, 19, 24, 0.2)",
+          tick: "#374151",
+          legend: "#111318",
+        }
+      : {
+          background: CHART_BACKGROUND_COLOR,
+          grid: CHART_GRID_COLOR,
+          gridStrong: CHART_GRID_STRONG_COLOR,
+          tick: "#8b949e",
+          legend: "#8b949e",
+        };
+  const chartPixelRatio =
+    typeof window === "undefined"
+      ? 1
+      : Math.min(compact ? 3 : 4, Math.max(2, window.devicePixelRatio || 1));
+  const toolPanelThemeClass =
+    theme === "light" ? "drawing-menu-light" : "drawing-menu-dark";
   const candleColors = {
     backgroundColors: {
       up: CANDLE_UP_COLOR,
@@ -1126,50 +1231,67 @@ export default function CandleChart({
     if (
       oldestCandleTime === undefined ||
       newestVisibleTime === undefined ||
+      oldestScrollableTime === undefined ||
+      newestScrollableTime === undefined ||
       loadedXRange <= 0
     ) {
       return null;
     }
 
     const visibleRange = range.max - range.min;
+    const scrollableRange = newestScrollableTime - oldestScrollableTime;
 
     if (!Number.isFinite(visibleRange) || visibleRange <= 0) return null;
 
-    if (visibleRange >= loadedXRange) {
+    if (visibleRange >= scrollableRange) {
       return {
         symbol,
         timeframe,
-        min: oldestCandleTime,
-        max: newestVisibleTime,
+        min: oldestScrollableTime,
+        max: newestScrollableTime,
       };
     }
 
-    const hasCandlesInView =
-      range.max >= oldestCandleTime && range.min <= newestVisibleTime;
-    const emptyLeft = Math.max(0, oldestCandleTime - range.min);
-    const emptyRight = Math.max(0, range.max - newestVisibleTime);
-    const tooMuchEmptySpace =
-      !hasCandlesInView ||
-      emptyLeft > visibleRange * 0.08 ||
-      emptyRight > visibleRange * 0.08;
+    const beyondPastLeft = Math.max(0, oldestScrollableTime - range.min);
+    const beyondFutureRight = Math.max(0, range.max - newestScrollableTime);
 
-    if (!tooMuchEmptySpace) return null;
+    if (beyondPastLeft <= 0 && beyondFutureRight <= 0) return null;
 
-    if (range.max < oldestCandleTime || emptyLeft > 0) {
+    if (range.max < oldestScrollableTime || beyondPastLeft > 0) {
       return {
         symbol,
         timeframe,
-        min: oldestCandleTime,
-        max: oldestCandleTime + visibleRange,
+        min: oldestScrollableTime,
+        max: oldestScrollableTime + visibleRange,
       };
     }
 
     return {
       symbol,
       timeframe,
-      min: newestVisibleTime - visibleRange,
-      max: newestVisibleTime,
+      min: newestScrollableTime - visibleRange,
+      max: newestScrollableTime,
     };
+  }
+
+  function clampLiveChartXRange(chart: ChartJS) {
+    const xScale = chart.scales.x;
+    const xOptions = chart.options.scales?.x;
+
+    if (!xScale || !xOptions) return;
+
+    const fixedRange = clampXRangeToCandles({
+      symbol,
+      timeframe,
+      min: xScale.min,
+      max: xScale.max,
+    });
+
+    if (!fixedRange) return;
+
+    xOptions.min = fixedRange.min;
+    xOptions.max = fixedRange.max;
+    chart.update("none");
   }
 
   useEffect(() => {
@@ -1179,7 +1301,7 @@ export default function CandleChart({
   }, [candles, currentXRange]);
 
   useEffect(() => {
-    if (!currentXRange || candles.length < 2) return;
+    if (!compact || !currentXRange || candles.length < 2) return;
 
     const fixedRange = clampXRangeToCandles(currentXRange);
 
@@ -1193,10 +1315,33 @@ export default function CandleChart({
         chartRef.current?.draw();
       });
     }
-  }, [candles, currentXRange, loadedXRange, oldestCandleTime, newestVisibleTime]);
+  }, [
+    candles,
+    compact,
+    currentXRange,
+    loadedXRange,
+    oldestCandleTime,
+    oldestScrollableTime,
+    newestScrollableTime,
+    newestVisibleTime,
+  ]);
 
   function redrawChart() {
-    window.requestAnimationFrame(() => chartRef.current?.draw());
+    if (drawFrameRef.current !== null) return;
+
+    drawFrameRef.current = window.requestAnimationFrame(() => {
+      drawFrameRef.current = null;
+      chartRef.current?.draw();
+    });
+  }
+
+  function scheduleCursorDraw() {
+    if (cursorDrawFrameRef.current !== null) return;
+
+    cursorDrawFrameRef.current = window.requestAnimationFrame(() => {
+      cursorDrawFrameRef.current = null;
+      chartRef.current?.draw();
+    });
   }
 
   function lockChartRangeWhileHovered() {
@@ -1247,7 +1392,7 @@ export default function CandleChart({
       cursorPriceRef.current = Number(yScale.getValueForPixel(pixelY));
     }
 
-    redrawChart();
+    scheduleCursorDraw();
   }
 
   function clearCursorPrice() {
@@ -1255,6 +1400,22 @@ export default function CandleChart({
     releaseHoveredChartRange();
     redrawChart();
   }
+
+  useEffect(() => {
+    return () => {
+      if (drawFrameRef.current !== null) {
+        window.cancelAnimationFrame(drawFrameRef.current);
+      }
+
+      if (cursorDrawFrameRef.current !== null) {
+        window.cancelAnimationFrame(cursorDrawFrameRef.current);
+      }
+
+      if (chartUpdateFrameRef.current !== null) {
+        window.cancelAnimationFrame(chartUpdateFrameRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     drawingsRef.current = drawings;
@@ -1327,10 +1488,27 @@ export default function CandleChart({
   }, []);
 
   useEffect(() => {
-    window.requestAnimationFrame(() => {
-      chartRef.current?.resize();
-      chartRef.current?.update("none");
-      chartRef.current?.draw();
+    if (chartUpdateFrameRef.current !== null) return;
+
+    chartUpdateFrameRef.current = window.requestAnimationFrame(() => {
+      chartUpdateFrameRef.current = null;
+      const chart = chartRef.current;
+
+      if (!chart) return;
+
+      const container = chart.canvas.parentElement;
+      const bounds = container?.getBoundingClientRect();
+
+      if (
+        bounds &&
+        (Math.abs(chart.width - bounds.width) > 1 ||
+          Math.abs(chart.height - bounds.height) > 1)
+      ) {
+        chart.resize();
+      }
+
+      chart.update("none");
+      chart.draw();
     });
   }, [candles.length, lastCandle?.x, lastCandle?.c]);
 
@@ -1353,8 +1531,155 @@ export default function CandleChart({
     redrawChart();
   }
 
+  function findDrawingAtClient(clientX: number, clientY: number) {
+    const chart = chartRef.current;
+    const xScale = chart?.scales.x;
+    const yScale = chart?.scales.y;
+    const chartArea = chart?.chartArea;
+    const canvas = chart?.canvas;
+
+    if (!chart || !xScale || !yScale || !chartArea || !canvas) return null;
+
+    const rect = canvas.getBoundingClientRect();
+    const pixelX = clientX - rect.left;
+    const pixelY = clientY - rect.top;
+
+    if (
+      pixelX < chartArea.left ||
+      pixelX > chartArea.right ||
+      pixelY < chartArea.top ||
+      pixelY > chartArea.bottom
+    ) {
+      return null;
+    }
+
+    for (let index = drawingsRef.current.length - 1; index >= 0; index -= 1) {
+      const item = drawingsRef.current[index];
+
+      const startX = xScale.getPixelForValue(item.start.x);
+      const startY = yScale.getPixelForValue(item.start.y);
+      let endX = xScale.getPixelForValue(item.end.x);
+      let endY = yScale.getPixelForValue(item.end.y);
+      const hitPadding = 8;
+
+      if (item.tool === "arrow-right") {
+        endX = Math.max(startX + 12, endX);
+        endY = startY;
+      }
+
+      if (item.tool === "arrow-left") {
+        endX = Math.min(startX - 12, endX);
+        endY = startY;
+      }
+
+      if (item.tool === "arrow-up") {
+        endX = startX;
+        endY = Math.min(startY - 12, endY);
+      }
+
+      if (item.tool === "arrow-down") {
+        endX = startX;
+        endY = Math.max(startY + 12, endY);
+      }
+
+      if (item.tool === "horizontal" && Math.abs(pixelY - startY) <= hitPadding) {
+        return item;
+      }
+
+      if (item.tool === "vertical" && Math.abs(pixelX - startX) <= hitPadding) {
+        return item;
+      }
+
+      const left = Math.min(startX, endX);
+      const right = Math.max(startX, endX);
+      const top = Math.min(startY, endY);
+      const bottom = Math.max(startY, endY);
+      const segmentLength = Math.hypot(endX - startX, endY - startY);
+      const distanceToSegment =
+        segmentLength === 0
+          ? Math.hypot(pixelX - startX, pixelY - startY)
+          : Math.abs(
+              (endY - startY) * pixelX -
+                (endX - startX) * pixelY +
+                endX * startY -
+                endY * startX
+            ) / segmentLength;
+
+      if (item.tool === "rectangle" || item.tool === "triangle") {
+        if (
+          pixelX >= left - hitPadding &&
+          pixelX <= right + hitPadding &&
+          pixelY >= top - hitPadding &&
+          pixelY <= bottom + hitPadding
+        ) {
+          return item;
+        }
+      }
+
+      if (
+        pixelX >= left - hitPadding &&
+        pixelX <= right + hitPadding &&
+        pixelY >= top - hitPadding &&
+        pixelY <= bottom + hitPadding &&
+        distanceToSegment <= hitPadding
+      ) {
+        return item;
+      }
+    }
+
+    return null;
+  }
+
+  function openDrawingColorMenu(event: React.MouseEvent<HTMLDivElement>) {
+    const drawing = findDrawingAtClient(event.clientX, event.clientY);
+
+    if (!drawing) {
+      setDrawingColorMenu(null);
+      leaveDrawingMode(event);
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+    setDrawingColorMenu({
+      drawingId: drawing.id,
+      tool: drawing.tool,
+      x: event.clientX,
+      y: event.clientY,
+    });
+  }
+
+  function setDrawingColor(drawingId: string, color: string) {
+    updateDrawings((prev) =>
+      prev.map((item) => {
+        const target = prev.find((drawing) => drawing.id === drawingId);
+        const isSameTrajectory =
+          target?.tool === "trajectory" &&
+          target.groupId &&
+          item.groupId === target.groupId;
+
+        return item.id === drawingId || isSameTrajectory ? { ...item, color } : item;
+      })
+    );
+    setDrawingColorMenu(null);
+  }
+
+  function deleteDrawing(drawingId: string) {
+    updateDrawings((prev) => {
+      const target = prev.find((item) => item.id === drawingId);
+
+      if (target?.tool === "trajectory" && target.groupId) {
+        return prev.filter((item) => item.groupId !== target.groupId);
+      }
+
+      return prev.filter((item) => item.id !== drawingId);
+    });
+    setDrawingColorMenu(null);
+  }
+
   function selectDrawingTool(tool: DrawingTool) {
     setDrawingTool(tool);
+    setDrawingColorMenu(null);
     resetDraftDrawing();
     trajectoryLastPointRef.current = null;
     redrawChart();
@@ -1374,22 +1699,36 @@ export default function CandleChart({
 
     if (!xScale || !yScale) return;
 
+    if (compact) {
+      clampLiveChartXRange(chart);
+    }
+
+    const clampedXRange =
+      !compact && rightWallTime !== undefined && xScale.max > rightWallTime
+        ? {
+            symbol,
+            timeframe,
+            min: rightWallTime - (xScale.max - xScale.min),
+            max: rightWallTime,
+          }
+        : {
+            symbol,
+            timeframe,
+            min: xScale.min,
+            max: xScale.max,
+          };
+
     setXRange((prev) => {
       if (
         prev?.symbol === symbol &&
         prev.timeframe === timeframe &&
-        prev.min === xScale.min &&
-        prev.max === xScale.max
+        prev.min === clampedXRange.min &&
+        prev.max === clampedXRange.max
       ) {
         return prev;
       }
 
-      return {
-        symbol,
-        timeframe,
-        min: xScale.min,
-        max: xScale.max,
-      };
+      return clampedXRange;
     });
 
     setYRange((prev) => {
@@ -1410,7 +1749,7 @@ export default function CandleChart({
       };
     });
 
-    requestOlderCandlesIfNeeded(xScale.min);
+    requestOlderCandlesIfNeeded(clampedXRange.min);
 
     redrawChart();
   }
@@ -1467,6 +1806,7 @@ export default function CandleChart({
       tool,
       start: target,
       end: target,
+      color: selectedDrawingColor,
     };
 
     updateDrawings((prev) => [...prev, nextDrawing]);
@@ -1499,6 +1839,7 @@ export default function CandleChart({
 
     if (!target) return;
 
+    setDrawingColorMenu(null);
     event.preventDefault();
     event.stopPropagation();
 
@@ -1517,6 +1858,7 @@ export default function CandleChart({
 
     if (activeTool === "trajectory") {
       const previousPoint = trajectoryLastPointRef.current;
+      const groupId = previousPoint?.groupId ?? nextDrawingId();
 
       if (previousPoint) {
         updateDrawings((prev) => [
@@ -1524,19 +1866,23 @@ export default function CandleChart({
           {
             id: nextDrawingId(),
             tool: "trajectory",
-            start: previousPoint,
+            start: previousPoint.point,
             end: target,
+            color: selectedDrawingColor,
+            groupId,
           },
         ]);
       }
 
-      trajectoryLastPointRef.current = target;
+      trajectoryLastPointRef.current = { point: target, groupId };
 
       const draft: Drawing = {
         id: nextDrawingId(),
         tool: "trajectory",
         start: target,
         end: target,
+        color: selectedDrawingColor,
+        groupId,
       };
 
       setDraftDrawing(draft);
@@ -1556,6 +1902,7 @@ export default function CandleChart({
       tool: activeTool,
       start: target,
       end: target,
+      color: activeTool === "ruler" ? undefined : selectedDrawingColor,
     };
 
     setDraftDrawing(draft);
@@ -1580,8 +1927,10 @@ export default function CandleChart({
       const nextDraft: Drawing = {
         id: draftDrawingRef.current?.id ?? nextDrawingId(),
         tool: "trajectory",
-        start,
+        start: start.point,
         end: point,
+        color: selectedDrawingColor,
+        groupId: start.groupId,
       };
 
       setDraftDrawing(nextDraft);
@@ -1629,6 +1978,7 @@ export default function CandleChart({
 
     const start = drawingStartRef.current;
     const point = getDrawingTarget(event);
+    const draft = draftDrawingRef.current;
 
     if (start) {
       updateDrawings((prev) => [
@@ -1637,7 +1987,9 @@ export default function CandleChart({
             id: nextDrawingId(),
             tool: activeTool,
             start,
-            end: point ?? draftDrawing?.end ?? start,
+            end: point ?? draft?.end ?? start,
+            color: activeTool === "ruler" ? undefined : draft?.color ?? selectedDrawingColor,
+            groupId: draft?.groupId,
           },
         ]);
     }
@@ -1700,7 +2052,7 @@ export default function CandleChart({
 
     if (!drag) return;
 
-    const factor = Math.exp((event.clientY - drag.startY) * 0.006);
+    const factor = Math.exp((event.clientY - drag.startY) * Y_SCALE_DRAG_SENSITIVITY);
     const nextRange = Math.max(drag.range * factor, Number.EPSILON);
     const min = drag.center - nextRange / 2;
     const max = drag.center + nextRange / 2;
@@ -1725,42 +2077,195 @@ export default function CandleChart({
   return (
     <div
       className={`relative flex h-full min-h-0 flex-col overflow-hidden ${heightClass}`}
-      style={{ backgroundColor: CHART_BACKGROUND_COLOR }}
+      style={{ backgroundColor: chartTheme.background }}
       onPointerMove={updateCursorPrice}
       onPointerEnter={lockChartRangeWhileHovered}
       onPointerLeave={clearCursorPrice}
-      onContextMenu={leaveDrawingMode}
+      onClick={() => setDrawingColorMenu(null)}
+      onContextMenu={openDrawingColorMenu}
     >
+      <style>
+        {`
+          .chart-control-menu {
+            border: 1px solid var(--draw-border);
+            border-radius: 10px;
+            background: var(--draw-bg);
+            color: var(--draw-text);
+            box-shadow: var(--draw-shadow);
+            backdrop-filter: blur(18px);
+          }
+
+          .drawing-menu-dark {
+            --draw-bg: rgba(0, 0, 0, 0.96);
+            --draw-cell: rgba(255, 255, 255, 0.015);
+            --draw-cell-hover: rgba(255, 255, 255, 0.08);
+            --draw-active: linear-gradient(180deg, rgba(255,255,255,0.16), rgba(255,255,255,0.05));
+            --draw-border: rgba(255, 255, 255, 0.16);
+            --draw-soft-border: rgba(255, 255, 255, 0.1);
+            --draw-text: #d1d5db;
+            --draw-muted: rgba(156, 163, 175, 0.72);
+            --draw-accent: #9ca3af;
+            --draw-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+          }
+
+          .drawing-menu-light {
+            --draw-bg: rgba(255, 255, 255, 0.96);
+            --draw-cell: rgba(17, 24, 39, 0.015);
+            --draw-cell-hover: rgba(17, 24, 39, 0.06);
+            --draw-active: #111827;
+            --draw-border: rgba(17, 24, 39, 0.16);
+            --draw-soft-border: rgba(17, 24, 39, 0.1);
+            --draw-text: #6b7280;
+            --draw-muted: rgba(107, 114, 128, 0.72);
+            --draw-accent: #9ca3af;
+            --draw-shadow: 0 18px 44px rgba(15, 23, 42, 0.12);
+          }
+
+          .chart-control-menu .tool-tabs {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            overflow: hidden;
+            border-bottom: 1px solid var(--draw-soft-border);
+          }
+
+          .chart-control-menu .tool-tab {
+            min-height: 34px;
+            border-right: 1px solid var(--draw-soft-border);
+            color: var(--draw-muted);
+            font-size: 13px;
+            font-weight: 900;
+            transition: background 220ms ease, color 220ms ease, box-shadow 220ms ease;
+          }
+
+          .chart-control-menu .tool-tab:last-child {
+            border-right: 0;
+          }
+
+          .chart-control-menu .tool-tab.is-active {
+            background: var(--draw-active);
+            color: ${theme === "light" ? "#ffffff" : "var(--draw-text)"};
+            box-shadow: none;
+          }
+
+          .chart-control-menu .tf-row {
+            display: grid;
+            overflow: hidden;
+            border-top: 1px solid var(--draw-soft-border);
+          }
+
+          .chart-control-menu .tf-cell {
+            min-height: 28px;
+            border-right: 1px solid var(--draw-soft-border);
+            color: var(--draw-accent);
+            font-size: 11px;
+            font-weight: 900;
+            padding: 0 8px;
+            transition: background 220ms ease, color 220ms ease;
+          }
+
+          .chart-control-menu .tf-cell.is-active {
+            background: var(--draw-active);
+            color: ${theme === "light" ? "#ffffff" : "var(--draw-text)"};
+          }
+
+          .drawing-grid {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+          }
+
+          .drawing-cell {
+            position: relative;
+            height: 64px;
+            border-top: 1px solid var(--draw-soft-border);
+            border-right: 1px solid var(--draw-soft-border);
+            background: var(--draw-cell);
+          }
+
+          .drawing-cell:nth-child(3n) {
+            border-right: 0;
+          }
+
+          .drawing-cell-button {
+            display: grid;
+            width: 100%;
+            height: 100%;
+            place-items: center;
+            color: var(--draw-accent);
+            transition: background 220ms ease, color 220ms ease, box-shadow 220ms ease;
+          }
+
+          .drawing-cell-button:hover,
+          .drawing-cell-button.is-active {
+            background: var(--draw-cell-hover);
+            color: var(--draw-text);
+            box-shadow: none;
+          }
+
+          .drawing-fav-button {
+            position: absolute;
+            right: 8px;
+            top: 6px;
+            z-index: 2;
+            color: var(--draw-muted);
+            font-size: 14px;
+            line-height: 1;
+            transition: color 200ms ease, transform 200ms ease;
+          }
+
+          .drawing-fav-button:hover,
+          .drawing-fav-button.is-active {
+            color: #6b7280;
+            transform: scale(1.08);
+          }
+
+          .drawing-color-row {
+            display: flex;
+            gap: 7px;
+            align-items: center;
+            padding: 7px 8px;
+            border-top: 1px solid var(--draw-soft-border);
+          }
+
+          .drawing-swatch {
+            width: 16px;
+            height: 16px;
+            border: 2px solid rgba(255, 255, 255, 0.34);
+            border-radius: 999px;
+            transition: transform 180ms ease, box-shadow 180ms ease;
+          }
+
+          .drawing-swatch.is-active {
+            transform: scale(1.12);
+            box-shadow: 0 0 0 3px rgba(107, 114, 128, 0.32);
+          }
+
+          .chart-watermark {
+            color: ${theme === "light" ? "rgba(17, 19, 24, 0.18)" : "rgba(255, 255, 255, 0.035)"};
+          }
+        `}
+      </style>
       {!compact && (
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-          <div className="select-none text-[52px] font-black tracking-widest text-white/[0.035]">
+          <div className="chart-watermark select-none text-[52px] font-black tracking-widest">
             {symbol.replace("USDT", "")}
           </div>
         </div>
       )}
 
       {toolsEnabled && (
-        <div className="fixed left-1/2 top-5 z-[9999] w-[330px] -translate-x-1/2 overflow-hidden rounded-md border border-white/10 bg-[#061014]/95 text-center shadow-[0_0_30px_rgba(209,91,255,0.2)] backdrop-blur">
-          <div className="grid grid-cols-3 border-b border-white/10 text-[11px] font-black">
+        <div className={`chart-control-menu ${toolPanelThemeClass} fixed left-1/2 top-4 z-[9999] w-[330px] max-w-[calc(100vw-28px)] -translate-x-1/2 overflow-hidden text-center`}>
+          <div className="tool-tabs">
             <button
               type="button"
               onClick={() => setActiveToolPanel((value) => (value === "tf" ? null : "tf"))}
-              className={`h-8 border-r border-white/10 transition ${
-                activeToolPanel === "tf"
-                  ? "bg-[#c8b6dc] text-black"
-                  : "text-white/75 hover:bg-white/[0.06]"
-              }`}
+              className={`tool-tab ${activeToolPanel === "tf" ? "is-active" : ""}`}
             >
               TF
             </button>
             <button
               type="button"
               onClick={() => setActiveToolPanel((value) => (value === "draw" ? null : "draw"))}
-              className={`grid h-8 place-items-center border-r border-white/10 transition ${
-                activeToolPanel === "draw"
-                  ? "bg-[#d15bff]/25 text-[#ffd6fb]"
-                  : "text-white/75 hover:bg-white/[0.06]"
-              }`}
+              className={`tool-tab grid place-items-center ${activeToolPanel === "draw" ? "is-active" : ""}`}
               title="Drawing tools"
             >
               <svg viewBox="0 0 42 24" className="h-5 w-9" aria-hidden="true">
@@ -1781,7 +2286,7 @@ export default function CandleChart({
                 trajectoryLastPointRef.current = null;
               }}
               disabled={drawings.length === 0}
-              className="h-8 text-white/75 transition hover:bg-white/[0.06] disabled:pointer-events-none disabled:opacity-35"
+              className="tool-tab disabled:pointer-events-none disabled:opacity-35"
               title="Undo drawing"
             >
               DO
@@ -1789,32 +2294,31 @@ export default function CandleChart({
           </div>
 
           {activeToolPanel === "tf" && timeframeControls && (
-            <div className="grid grid-cols-8 border-b border-white/10 text-[10px] font-semibold">
+            <div
+              className="tf-row"
+              style={{
+                gridTemplateColumns: `repeat(${timeframeControls.visible.length}, minmax(44px, 1fr))`,
+              }}
+            >
               {timeframeControls.visible.map((item) => (
                 <button
                   key={item}
                   type="button"
                   onClick={() => timeframeControls.onChange(item)}
-                  className={`h-6 border-r border-white/10 transition last:border-r-0 ${
-                    timeframeControls.active === item
-                      ? "bg-[#c8b6dc] text-black"
-                      : "text-white/70 hover:bg-white/[0.06] hover:text-white"
-                  }`}
+                  className={`tf-cell ${timeframeControls.active === item ? "is-active" : ""}`}
                 >
                   {item}
                 </button>
               ))}
             </div>
           )}
-
           {activeToolPanel === "draw" && (
-            <div className="grid grid-cols-3 bg-[#120817]/78 text-[#f1c7ff]">
+            <>
+            <div className="drawing-grid">
               {DRAWING_TABLE_ITEMS.map((item, index) => (
                 <div
                   key={item.kind === "clear" ? item.id : item.tool}
-                  className={`relative h-14 border-t border-[#d15bff]/30 ${
-                    index % 3 !== 2 ? "border-r border-[#d15bff]/30" : ""
-                  }`}
+                  className="drawing-cell"
                 >
                   {item.kind === "tool" && (
                     <button
@@ -1823,10 +2327,8 @@ export default function CandleChart({
                         event.stopPropagation();
                         toggleFavoriteDrawingTool(item.tool);
                       }}
-                      className={`absolute right-1 top-1 z-10 grid size-4 place-items-center text-[11px] leading-none transition hover:scale-110 ${
-                        favoriteDrawingTools.includes(item.tool)
-                          ? "text-[#c8b6dc]"
-                          : "text-white/28 hover:text-[#c8b6dc]"
+                      className={`drawing-fav-button ${
+                        favoriteDrawingTools.includes(item.tool) ? "is-active" : ""
                       }`}
                       title={
                         favoriteDrawingTools.includes(item.tool)
@@ -1852,12 +2354,8 @@ export default function CandleChart({
                       selectDrawingTool(item.tool);
                     }}
                     disabled={item.kind === "clear" && drawings.length === 0 && !draftDrawing}
-                    className={`grid h-full w-full place-items-center transition disabled:pointer-events-none disabled:opacity-35 ${
-                      item.kind === "tool" && drawingTool === item.tool
-                        ? item.tool === "cursor"
-                          ? "bg-[#c8b6dc]/18 text-[#c8b6dc] shadow-[inset_0_0_18px_rgba(200,182,220,0.16)]"
-                          : "bg-[#d15bff]/24 text-white shadow-[inset_0_0_18px_rgba(255,79,216,0.18)]"
-                        : "text-[#e7a8ff] hover:bg-[#d15bff]/12 hover:text-white"
+                    className={`drawing-cell-button disabled:pointer-events-none disabled:opacity-35 ${
+                      item.kind === "tool" && drawingTool === item.tool ? "is-active" : ""
                     }`}
                     title={item.title}
                   >
@@ -1869,16 +2367,42 @@ export default function CandleChart({
                 </div>
               ))}
             </div>
+            <div className="drawing-color-row">
+              {DRAWING_RAINBOW_COLORS.map((color) => (
+                <button
+                  key={color}
+                  type="button"
+                  className={`drawing-swatch ${selectedDrawingColor === color ? "is-active" : ""}`}
+                  style={{ backgroundColor: color }}
+                  onClick={() => setSelectedDrawingColor(color)}
+                  title={`Drawing color ${color}`}
+                />
+              ))}
+              <span className="ml-auto text-[11px] font-bold uppercase tracking-[0.12em] opacity-60">
+                Ruler auto
+              </span>
+            </div>
+            </>
           )}
         </div>
       )}
 
       <div className="relative min-h-0 flex-1">
       {toolsEnabled && (
-        <div className="absolute left-0 top-0 z-[70] flex max-w-[calc(100%-48px)] items-start gap-1 rounded-br-md border-b border-r border-[#c8b6dc]/25 bg-[#08040d]/86 p-1 shadow-[0_0_16px_rgba(200,182,220,0.14)] backdrop-blur">
+        <div
+          className={`absolute left-0 top-0 z-[70] flex max-w-[calc(100%-48px)] items-start gap-1 rounded-br-md border-b border-r p-1 shadow-sm backdrop-blur ${
+            theme === "light"
+              ? "border-slate-300/80 bg-white/90"
+              : "border-white/15 bg-black/88"
+          }`}
+        >
           <div
             className={`grid size-7 shrink-0 place-items-center text-sm leading-none ${
-              favoriteDrawingItems.length > 0 ? "text-[#c8b6dc]" : "text-white/38"
+              favoriteDrawingItems.length > 0
+                ? "text-gray-500"
+                : theme === "light"
+                  ? "text-slate-400"
+                  : "text-white/38"
             }`}
             title="Drawing favorites"
           >
@@ -1891,10 +2415,14 @@ export default function CandleChart({
                   key={item.tool}
                   type="button"
                   onClick={() => selectDrawingTool(item.tool)}
-                  className={`grid size-7 place-items-center rounded border border-[#c8b6dc]/20 transition hover:border-[#c8b6dc]/50 hover:bg-[#c8b6dc]/12 ${
+                  className={`grid size-7 place-items-center rounded border transition ${
                     drawingTool === item.tool
-                      ? "bg-[#c8b6dc]/18 text-[#c8b6dc]"
-                      : "text-[#e7a8ff]"
+                      ? theme === "light"
+                        ? "border-gray-400 bg-gray-100 text-gray-500"
+                        : "border-white/25 bg-white/10 text-gray-300"
+                      : theme === "light"
+                        ? "border-slate-300 text-gray-500 hover:border-gray-400 hover:bg-slate-100"
+                        : "border-white/15 text-gray-400 hover:border-white/30 hover:bg-white/10"
                   }`}
                   title={item.title}
                 >
@@ -1918,7 +2446,7 @@ export default function CandleChart({
               type: "candlestick" as const,
               label: symbol,
               data: candles,
-              borderWidth: compact ? 1 : 1.2,
+              borderWidth: compact ? 1.25 : 1.65,
               ...candleColors,
             },
           ],
@@ -1926,9 +2454,8 @@ export default function CandleChart({
         options={{
           responsive: true,
           maintainAspectRatio: false,
-          animation: {
-            duration: 180,
-          },
+          devicePixelRatio: chartPixelRatio,
+          animation: false,
           parsing: false,
           normalized: true,
           interaction: {
@@ -1944,16 +2471,20 @@ export default function CandleChart({
               ticks: {
                 autoSkip: true,
                 maxTicksLimit,
-                color: "#6f7681",
+                color: chartTheme.tick,
                 font: {
+                  family: CHART_FONT_FAMILY,
                   size: compact ? 9 : 10,
+                  weight: "bold",
                 },
               },
               grid: {
-                color: CHART_GRID_COLOR,
+                color: chartTheme.grid,
+                lineWidth: 1,
               },
               border: {
-                color: CHART_GRID_STRONG_COLOR,
+                color: chartTheme.gridStrong,
+                width: 1,
               },
             },
             y: {
@@ -1961,19 +2492,23 @@ export default function CandleChart({
               min: activeYRange?.min ?? (candles.length ? autoYMin : undefined),
               max: activeYRange?.max ?? (candles.length ? autoYMax : undefined),
               ticks: {
-                color: "#8b949e",
+                color: chartTheme.tick,
                 maxTicksLimit,
                 stepSize: currentYRange ? undefined : yStep,
                 callback: (value) => formatAxisPrice(Number(value), yStep),
                 font: {
+                  family: CHART_FONT_FAMILY,
                   size: compact ? 9 : 10,
+                  weight: "bold",
                 },
               },
               grid: {
-                color: CHART_GRID_COLOR,
+                color: chartTheme.grid,
+                lineWidth: 1,
               },
               border: {
-                color: CHART_GRID_STRONG_COLOR,
+                color: chartTheme.gridStrong,
+                width: 1,
               },
             },
           },
@@ -1982,16 +2517,17 @@ export default function CandleChart({
               display: !compact,
               position: "top",
               labels: {
-                color: "#8b949e",
+                color: chartTheme.legend,
                 boxWidth: 10,
                 boxHeight: 10,
                 font: {
+                  family: CHART_FONT_FAMILY,
                   size: 10,
                 },
               },
             },
             tooltip: {
-              enabled: true,
+              enabled: false,
               backgroundColor: "rgba(17,17,22,0.94)",
               titleColor: "#ffffff",
               bodyColor: "#d1d5db",
@@ -2001,23 +2537,32 @@ export default function CandleChart({
               displayColors: true,
               mode: "nearest",
               intersect: false,
+              titleFont: {
+                family: CHART_FONT_FAMILY,
+                weight: "bold",
+              },
+              bodyFont: {
+                family: CHART_FONT_FAMILY,
+              },
             },
             zoom: {
               limits: {
                 x:
-                  oldestCandleTime !== undefined &&
-                  newestVisibleTime !== undefined &&
-                  newestVisibleTime > oldestCandleTime
+                  oldestScrollableTime !== undefined &&
+                  newestScrollableTime !== undefined &&
+                  newestScrollableTime > oldestScrollableTime
                     ? {
-                        min: oldestCandleTime,
-                        max: newestVisibleTime,
+                        min: oldestScrollableTime,
+                        max: newestScrollableTime,
+                        minRange: candleSpacing * 10,
                       }
                     : undefined,
               },
               pan: {
                 enabled: true,
                 mode: "xy",
-                threshold: 1,
+                threshold: 0,
+                onPan: compact ? ({ chart }: ZoomEvent) => clampLiveChartXRange(chart) : undefined,
                 onPanComplete: rememberChartRange,
               },
               zoom: {
@@ -2050,8 +2595,55 @@ export default function CandleChart({
         onPointerMove={moveDrawing}
         onPointerUp={finishDrawing}
         onPointerCancel={cancelDrawing}
-        onContextMenu={leaveDrawingMode}
+        onContextMenu={openDrawingColorMenu}
       />
+      )}
+
+      {drawingColorMenu && (
+        <div
+          className="fixed z-[10000] w-32 rounded-md border border-white/10 bg-[#08040d]/95 p-2 shadow-[0_0_22px_rgba(209,91,255,0.24)] backdrop-blur"
+          style={{
+            left: Math.min(drawingColorMenu.x, window.innerWidth - 136),
+            top: Math.min(drawingColorMenu.y, window.innerHeight - 116),
+          }}
+          onClick={(event) => event.stopPropagation()}
+          onContextMenu={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+          }}
+        >
+          {drawingColorMenu.tool !== "ruler" && (
+            <div className="grid grid-cols-4 gap-1">
+              {DRAWING_RAINBOW_COLORS.map((color) => (
+                <button
+                  key={color}
+                  type="button"
+                  className="size-6 rounded-sm border border-white/20 transition hover:scale-110 hover:border-white"
+                  style={{ backgroundColor: color }}
+                  onClick={() => setDrawingColor(drawingColorMenu.drawingId, color)}
+                  aria-label={`Set drawing color ${color}`}
+                />
+              ))}
+            </div>
+          )}
+          <button
+            type="button"
+            className={`${drawingColorMenu.tool === "ruler" ? "" : "mt-2"} flex w-full items-center justify-center gap-1 rounded-sm border border-[#ff576d]/30 bg-[#ff576d]/10 px-2 py-1.5 text-[11px] font-bold text-[#ff8b9a] transition hover:bg-[#ff576d]/18 hover:text-white`}
+            onClick={() => deleteDrawing(drawingColorMenu.drawingId)}
+          >
+            <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" aria-hidden="true">
+              <path
+                d="M8 8V19M12 8V19M16 8V19M5 6H19M9 6V4H15V6M7 6L8 21H16L17 6"
+                fill="none"
+                stroke="currentColor"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth="1.9"
+              />
+            </svg>
+            Delete
+          </button>
+        </div>
       )}
 
       <div
@@ -2078,7 +2670,7 @@ export default function CandleChart({
           </span>
         </div>
         <div className="flex h-[calc(100%-14px)] items-end gap-px overflow-hidden">
-          {volumeCandles.map((candle) => {
+          {renderedVolumeCandles.map((candle) => {
             const volume = Math.max(0, Number(candle.v ?? 0));
             const height = Math.max(2, (volume / maxVolume) * 100);
             const isUp = candle.c >= candle.o;
