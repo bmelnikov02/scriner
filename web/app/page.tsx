@@ -4,6 +4,7 @@ import dynamic from "next/dynamic";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ComponentProps, CSSProperties } from "react";
 import type { ChartDrawing } from "./components/CandleChart";
+import OrderBook from "./components/OrderBook";
 
 const CandleChartBase = dynamic(() => import("./components/CandleChart"), {
   ssr: false,
@@ -34,6 +35,7 @@ const CandleChart = memo(
       prev.compact === next.compact &&
       prev.showTools === next.showTools &&
       prev.drawings === next.drawings &&
+      prev.limitLines === next.limitLines &&
       sameControls
     );
   }
@@ -53,6 +55,22 @@ type Candle = {
   l: number;
   c: number;
   v?: number;
+};
+
+type DepthLevel = [string, string];
+
+type DepthData = {
+  symbol: string;
+  bids: DepthLevel[];
+  asks: DepthLevel[];
+};
+
+type LimitLine = {
+  price: number;
+  quantity: string;
+  notional: number;
+  side: "bid" | "ask";
+  strength: number;
 };
 
 type BinanceTicker = {
@@ -95,6 +113,7 @@ type FloatingMenu =
   | "favorites"
   | "volatility"
   | "settings";
+type ChartPageMotion = "idle" | "next" | "prev";
 
 type SavedWorkspace = {
   activeView?: "overview" | "favorites";
@@ -127,6 +146,10 @@ type WsMessage =
           v?: number | string;
         };
       };
+    }
+  | {
+      event: "depth:update";
+      data: DepthData;
     };
 
 const GRID_COUNTS = Array.from({ length: 12 }, (_, index) => index + 1);
@@ -479,6 +502,60 @@ function buildFallbackRows(symbols: string[]) {
   }, {});
 }
 
+function getStrongestDepthLines(
+  levels: DepthLevel[],
+  side: "bid" | "ask",
+  limit: number,
+  minNotional: number
+): LimitLine[] {
+  const parsedLevels = levels
+    .map(([price, quantity]) => ({
+      price: Number(price),
+      quantity,
+      quantityValue: Number(quantity),
+      side,
+    }))
+    .filter(
+      (level) =>
+        Number.isFinite(level.price) &&
+        Number.isFinite(level.quantityValue) &&
+        level.quantityValue > 0
+    )
+    .map((level) => ({
+      ...level,
+      notional: level.price * level.quantityValue,
+    }))
+    .filter((level) => Number.isFinite(level.notional) && level.notional > 0);
+
+  const maxNotional = Math.max(1, ...parsedLevels.map((level) => level.notional));
+  const adaptiveMinNotional = Math.max(minNotional, maxNotional * 0.35);
+  const parsed = parsedLevels
+    .filter((level) => level.notional >= adaptiveMinNotional)
+    .sort((a, b) => b.notional - a.notional)
+    .slice(0, limit);
+
+  return parsed.map((level) => ({
+    price: level.price,
+    quantity: level.quantity,
+    notional: level.notional,
+    side: level.side,
+    strength: Math.max(0.25, Math.min(1, level.notional / maxNotional)),
+  }));
+}
+
+function getDepthLimitLines(
+  data: DepthData | undefined,
+  limitPerSide: number,
+  minNotional: number
+): LimitLine[] {
+  if (!data) return [];
+
+  return [
+    ...getStrongestDepthLines(data.bids, "bid", limitPerSide, minNotional),
+    ...getStrongestDepthLines(data.asks, "ask", limitPerSide, minNotional),
+  ];
+}
+
 function getApiUrl(path: string) {
   const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL?.replace(/\/$/, "");
 
@@ -552,9 +629,19 @@ function getChartColumnCount(count: number) {
   return 4;
 }
 
+function getDepthChartColumnCount(count: number) {
+  if (count <= 1) return 1;
+  if (count <= 4) return 2;
+  if (count <= 6) return 3;
+  if (count <= 8) return 4;
+  if (count <= 9) return 3;
+  return 4;
+}
+
 export default function Home() {
   const [rows, setRows] = useState<Record<string, Row>>({});
   const [candles, setCandles] = useState<Record<string, Candle[]>>({});
+  const [depth, setDepth] = useState<Record<string, DepthData>>({});
   const [allSymbols, setAllSymbols] = useState<string[]>([]);
   const [gridCount, setGridCount] = useState(9);
   const [timeframe, setTimeframe] = useState("1h");
@@ -562,6 +649,7 @@ export default function Home() {
   const [timeframeAddOpen, setTimeframeAddOpen] = useState(false);
   const [customTimeframes, setCustomTimeframes] = useState<string[]>([]);
   const [gridOpen, setGridOpen] = useState(false);
+  const [depthOpen, setDepthOpen] = useState(false);
   const [gridWindowStart, setGridWindowStart] = useState(
     DEFAULT_GRID_WINDOW_START
   );
@@ -594,6 +682,8 @@ export default function Home() {
     "overview"
   );
   const [pageIndex, setPageIndex] = useState(0);
+  const [chartPageMotion, setChartPageMotion] =
+    useState<ChartPageMotion>("idle");
   const [coinSortMode, setCoinSortMode] = useState<CoinSortMode>("volume");
   const [siteStyle, setSiteStyle] = useState<SiteStyle>("light");
   const [workspaceLoaded, setWorkspaceLoaded] = useState(false);
@@ -609,6 +699,7 @@ export default function Home() {
   const fullscreenSymbolRef = useRef<string | null>(null);
   const timeframeClientAggregationRef = useRef<Record<string, boolean>>({});
   const quickSearchTimerRef = useRef<number | null>(null);
+  const chartPageMotionTimerRef = useRef<number | null>(null);
   const olderCandlesLoadingRef = useRef<Set<string>>(new Set());
   const pendingTickerRowsRef = useRef<Record<string, Row>>({});
   const tickerRowsFrameRef = useRef<number | null>(null);
@@ -773,6 +864,30 @@ export default function Home() {
     [gridWindowStart]
   );
 
+  const animateChartPage = useCallback((motion: Exclude<ChartPageMotion, "idle">) => {
+    if (chartPageMotionTimerRef.current !== null) {
+      window.clearTimeout(chartPageMotionTimerRef.current);
+    }
+
+    setChartPageMotion(motion);
+    chartPageMotionTimerRef.current = window.setTimeout(() => {
+      setChartPageMotion("idle");
+      chartPageMotionTimerRef.current = null;
+    }, 340);
+  }, []);
+
+  const goToChartPage = useCallback(
+    (nextPage: number) => {
+      const clamped = Math.min(pageCount - 1, Math.max(0, nextPage));
+
+      if (clamped === safePageIndex) return;
+
+      animateChartPage(clamped > safePageIndex ? "next" : "prev");
+      setPageIndex(clamped);
+    },
+    [animateChartPage, pageCount, safePageIndex]
+  );
+
   useEffect(() => {
     alertsEnabledRef.current = alertsEnabled;
     alertThresholdPercentRef.current = alertThresholdPercent;
@@ -791,6 +906,10 @@ export default function Home() {
     return () => {
       if (quickSearchTimerRef.current) {
         window.clearTimeout(quickSearchTimerRef.current);
+      }
+
+      if (chartPageMotionTimerRef.current !== null) {
+        window.clearTimeout(chartPageMotionTimerRef.current);
       }
 
       if (tickerRowsFrameRef.current !== null) {
@@ -1155,6 +1274,13 @@ export default function Home() {
           queueTickerRow(parsed.data);
         }
 
+        if (parsed.event === "depth:update") {
+          setDepth((prev) => ({
+            ...prev,
+            [parsed.data.symbol]: parsed.data,
+          }));
+        }
+
         if (parsed.event === "candle:update") {
           const { symbol, candle, interval } = parsed.data;
           const activeFullscreenSymbol = fullscreenSymbolRef.current;
@@ -1409,7 +1535,7 @@ export default function Home() {
           return;
         }
 
-        setPageIndex((prev) => Math.max(0, prev - 1));
+        goToChartPage(safePageIndex - 1);
         return;
       }
 
@@ -1420,7 +1546,7 @@ export default function Home() {
           return;
         }
 
-        setPageIndex((prev) => Math.min(pageCount - 1, prev + 1));
+        goToChartPage(safePageIndex + 1);
       }
     }
 
@@ -1434,9 +1560,11 @@ export default function Home() {
     fullscreenSymbol,
     gridCount,
     gridOpen,
+    goToChartPage,
     pageCount,
     quickSearchText,
     quickSearchVisible,
+    safePageIndex,
     settingsOpen,
     timeframe,
     timeframeOpen,
@@ -1767,13 +1895,37 @@ export default function Home() {
   }
 
   const chartHeight = "h-full min-h-0 flex-1";
-  const chartColumnCount = getChartColumnCount(visibleSymbols.length);
-  const hasWideBottomChart =
-    visibleSymbols.length > 1 && visibleSymbols.length % 2 === 1;
+  const gridDepthLevels = depthOpen
+    ? visibleSymbols.length >= 5
+      ? 2
+      : visibleSymbols.length >= 3
+        ? 3
+        : 5
+    : gridCount >= 9
+      ? 4
+      : gridCount >= 4
+        ? 5
+        : 6;
+  const chartColumnCount = depthOpen
+    ? getDepthChartColumnCount(visibleSymbols.length)
+    : getChartColumnCount(visibleSymbols.length);
+  const bottomRowCount = visibleSymbols.length % chartColumnCount;
+  const lastChartColumnSpan =
+    visibleSymbols.length > 1 && bottomRowCount > 0
+      ? chartColumnCount - bottomRowCount + 1
+      : 1;
+  const hasWideBottomChart = lastChartColumnSpan > 1;
   const chartGridStyle = {
     gridAutoRows: "minmax(0, 1fr)",
     gridTemplateColumns: `repeat(${chartColumnCount}, minmax(0, 1fr))`,
   };
+  const chartGridClass = `chart-grid grid min-h-0 flex-1 gap-0 overflow-hidden ${
+    chartPageMotion === "next"
+      ? "chart-grid-slide-next"
+      : chartPageMotion === "prev"
+        ? "chart-grid-slide-prev"
+        : ""
+  }`;
   const shellGridClass =
     "lg:grid-cols-[minmax(0,1fr)_285px] xl:grid-cols-[minmax(0,1fr)_305px]";
 
@@ -3102,7 +3254,18 @@ export default function Home() {
               >
                 TF
               </button>
-              <div className="main-toolbar-item main-toolbar-icon" title="Barrier">
+              <button
+                type="button"
+                onClick={() => {
+                  setDepthOpen((value) => !value);
+                  closeFloatingMenus();
+                }}
+                className={`main-toolbar-item main-toolbar-icon ${
+                  depthOpen ? "is-active" : ""
+                }`}
+                title="Depth order book"
+                aria-label="Toggle order book"
+              >
                 <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden="true">
                   <path
                     d="M5 7H19V13H5Z"
@@ -3120,7 +3283,7 @@ export default function Home() {
                     strokeWidth="1.8"
                   />
                 </svg>
-              </div>
+              </button>
               <button
                 type="button"
                 onClick={() => toggleFloatingMenu("alerts")}
@@ -3640,7 +3803,7 @@ export default function Home() {
             <div className="flex items-center gap-2">
               <button
                 type="button"
-                onClick={() => setPageIndex(Math.max(0, safePageIndex - 1))}
+                onClick={() => goToChartPage(safePageIndex - 1)}
                 disabled={safePageIndex === 0}
                 className="grid size-8 place-items-center rounded-md border border-white/10 text-sm font-black text-white/70 transition hover:border-[#c8b6dc]/50 hover:bg-[#c8b6dc]/10 hover:text-[#c8b6dc] disabled:pointer-events-none disabled:opacity-35"
                 aria-label="Previous charts"
@@ -3654,9 +3817,7 @@ export default function Home() {
 
               <button
                 type="button"
-                onClick={() =>
-                  setPageIndex(Math.min(pageCount - 1, safePageIndex + 1))
-                }
+                onClick={() => goToChartPage(safePageIndex + 1)}
                 disabled={safePageIndex >= pageCount - 1}
                 className="grid size-8 place-items-center rounded-md border border-white/10 text-sm font-black text-white/70 transition hover:border-[#c8b6dc]/50 hover:bg-[#c8b6dc]/10 hover:text-[#c8b6dc] disabled:pointer-events-none disabled:opacity-35"
                 aria-label="Next charts"
@@ -3667,7 +3828,7 @@ export default function Home() {
           </div>
 
           <div
-            className="chart-grid grid min-h-0 flex-1 gap-0 overflow-hidden"
+            className={chartGridClass}
             style={chartGridStyle}
           >
             {visibleSymbols.length === 0 ? (
@@ -3680,15 +3841,28 @@ export default function Home() {
               const changePositive = (row?.change24h ?? 0) >= 0;
               const isFavorite = favorites.includes(symbol);
               const drawingKey = getDrawingKey(symbol, timeframe);
+              const densityLineCount =
+                visibleSymbols.length >= 5 ? 2 : visibleSymbols.length >= 3 ? 3 : 4;
+              const densityMinNotional = visibleSymbols.length >= 5 ? 25_000 : 15_000;
+              const limitLines = depthOpen
+                ? getDepthLimitLines(
+                    depth[symbol],
+                    densityLineCount,
+                    densityMinNotional
+                  )
+                : [];
               const isWideBottomChart =
                 hasWideBottomChart && index === visibleSymbols.length - 1;
+              const chartStyle = isWideBottomChart
+                ? { gridColumn: `span ${lastChartColumnSpan}` }
+                : undefined;
 
               return (
                 <article
                   key={`${symbol}-${timeframe}`}
                   onDoubleClick={() => setFullscreenSymbol(symbol)}
                   className="chart-card relative flex min-h-0 flex-col overflow-hidden border border-white/10 bg-[#080d11] shadow-[0_0_35px_rgba(0,0,0,0.2)]"
-                  style={isWideBottomChart ? { gridColumn: "1 / -1" } : undefined}
+                  style={chartStyle}
                 >
                   <div className="chart-card-header flex shrink-0 items-start justify-between gap-2 p-2 pb-1">
                     <div className="min-w-0">
@@ -3748,11 +3922,21 @@ export default function Home() {
                       theme={siteStyle}
                       compact
                       drawings={drawingsByChart[drawingKey] ?? EMPTY_DRAWINGS}
+                      limitLines={limitLines}
                       onNeedOlderCandles={(oldestTime) =>
                         void loadOlderCandles(symbol, oldestTime)
                       }
                     />
                   </div>
+
+                  {depthOpen && (
+                    <OrderBook
+                      symbol={symbol}
+                      bids={depth[symbol]?.bids ?? []}
+                      asks={depth[symbol]?.asks ?? []}
+                      maxLevels={gridDepthLevels}
+                    />
+                  )}
 
                   <button
                     type="button"
@@ -4090,6 +4274,9 @@ export default function Home() {
                 drawingsByChart[getDrawingKey(fullscreenSymbol, timeframe)] ??
                 EMPTY_DRAWINGS
               }
+              limitLines={
+                depthOpen ? getDepthLimitLines(depth[fullscreenSymbol], 6, 10_000) : []
+              }
               onDrawingsChange={(nextDrawings) =>
                 updateChartDrawings(fullscreenSymbol, nextDrawings)
               }
@@ -4097,6 +4284,14 @@ export default function Home() {
                 void loadOlderCandles(fullscreenSymbol, oldestTime)
               }
             />
+            {depthOpen && (
+              <OrderBook
+                symbol={fullscreenSymbol}
+                bids={depth[fullscreenSymbol]?.bids ?? []}
+                asks={depth[fullscreenSymbol]?.asks ?? []}
+                maxLevels={12}
+              />
+            )}
           </div>
         </div>
       )}

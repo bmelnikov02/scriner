@@ -35,6 +35,14 @@ type Candle = {
   v?: number;
 };
 
+type LimitLine = {
+  price: number;
+  quantity: string;
+  notional: number;
+  side: "bid" | "ask";
+  strength: number;
+};
+
 type Props = {
   symbol: string;
   candles: Candle[];
@@ -52,6 +60,7 @@ type Props = {
     onShift: (direction: -1 | 1) => void;
   };
   drawings?: Drawing[];
+  limitLines?: LimitLine[];
   onDrawingsChange?: (drawings: Drawing[]) => void;
   onNeedOlderCandles?: (oldestTime: number) => void;
 };
@@ -213,6 +222,25 @@ function formatLinePrice(value: number) {
   if (value >= 100) return value.toFixed(1);
   if (value >= 1) return value.toFixed(4);
   return value.toFixed(6);
+}
+
+function formatLimitQuantity(value: string) {
+  const number = Number(value);
+
+  if (!Number.isFinite(number)) return value;
+  if (number >= 1_000_000) return `${(number / 1_000_000).toFixed(1)}M`;
+  if (number >= 1_000) return `${(number / 1_000).toFixed(1)}K`;
+  if (number >= 1) return number.toFixed(2);
+
+  return number.toFixed(4);
+}
+
+function formatLimitNotional(value: number) {
+  if (!Number.isFinite(value)) return "";
+  if (value >= 1_000_000) return `$${(value / 1_000_000).toFixed(1)}M`;
+  if (value >= 1_000) return `$${(value / 1_000).toFixed(0)}K`;
+
+  return `$${value.toFixed(0)}`;
 }
 
 function isStoredDrawingTool(value: unknown): value is DrawingTool {
@@ -496,6 +524,7 @@ export default function CandleChart({
   showTools = false,
   timeframeControls,
   drawings: controlledDrawings,
+  limitLines = [],
   onDrawingsChange,
   onNeedOlderCandles,
 }: Props) {
@@ -509,6 +538,7 @@ export default function CandleChart({
   const chartUpdateFrameRef = useRef<number | null>(null);
   const drawingsRef = useRef<Drawing[]>([]);
   const draftDrawingRef = useRef<Drawing | null>(null);
+  const limitLinesRef = useRef<LimitLine[]>([]);
   const toolsEnabledRef = useRef(false);
   const trajectoryLastPointRef = useRef<{
     point: DrawingPoint;
@@ -632,6 +662,71 @@ export default function CandleChart({
         ctx.textBaseline = "middle";
         ctx.fillText(text, x + labelWidth / 2, labelY + labelHeight / 2);
         ctx.restore();
+      };
+      const drawLimitLines = () => {
+        const lines = limitLinesRef.current;
+
+        if (lines.length === 0) return;
+
+        lines.forEach((line) => {
+          const y = yScale.getPixelForValue(line.price);
+
+          if (
+            !Number.isFinite(line.price) ||
+            !Number.isFinite(y) ||
+            y < chartArea.top ||
+            y > chartArea.bottom
+          ) {
+            return;
+          }
+
+          const isBid = line.side === "bid";
+          const color = isBid ? "#24e66f" : "#ff576d";
+          const text = `${isBid ? "BID" : "ASK"} ${formatLimitNotional(line.notional) || formatLimitQuantity(line.quantity)}`;
+          const alpha = 0.32 + line.strength * 0.54;
+          const lineWidth = (compact ? 0.8 : 1) + line.strength * (compact ? 1.1 : 1.7);
+
+          ctx.save();
+          ctx.beginPath();
+          ctx.moveTo(chartArea.left, y);
+          ctx.lineTo(chartArea.right, y);
+          ctx.lineWidth = lineWidth;
+          ctx.strokeStyle = isBid
+            ? `rgba(36,230,111,${alpha})`
+            : `rgba(255,87,109,${alpha})`;
+          ctx.setLineDash([]);
+          ctx.shadowBlur = (compact ? 3 : 6) * line.strength;
+          ctx.shadowColor = color;
+          ctx.stroke();
+
+          ctx.setLineDash([]);
+          ctx.shadowBlur = 0;
+          ctx.font = `${compact ? "700 9px" : "800 10px"} Arial, Helvetica, sans-serif`;
+          const paddingX = 5;
+          const labelHeight = compact ? 15 : 17;
+          const labelWidth = Math.ceil(ctx.measureText(text).width + paddingX * 2);
+          const labelX = chartArea.left + 6;
+          const labelY = Math.min(
+            Math.max(chartArea.top + 3, y - labelHeight / 2),
+            chartArea.bottom - labelHeight - 3
+          );
+
+          ctx.fillStyle = isBid ? "rgba(3,32,18,0.9)" : "rgba(43,10,18,0.9)";
+          ctx.strokeStyle = isBid
+            ? `rgba(36,230,111,${Math.min(0.75, alpha)})`
+            : `rgba(255,87,109,${Math.min(0.75, alpha)})`;
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.roundRect(labelX, labelY, labelWidth, labelHeight, 4);
+          ctx.fill();
+          ctx.stroke();
+
+          ctx.fillStyle = color;
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+          ctx.fillText(text, labelX + labelWidth / 2, labelY + labelHeight / 2);
+          ctx.restore();
+        });
       };
       const drawLine = (
         x1: number,
@@ -1042,6 +1137,7 @@ export default function CandleChart({
         drawLine(startX, startY, endX, endY, draft, item.color);
       });
 
+      drawLimitLines();
       drawCurrentPriceLine();
       drawCursorPriceLabel();
     },
@@ -1420,9 +1516,10 @@ export default function CandleChart({
   useEffect(() => {
     drawingsRef.current = drawings;
     draftDrawingRef.current = draftDrawing;
+    limitLinesRef.current = limitLines;
     toolsEnabledRef.current = toolsEnabled;
     redrawChart();
-  }, [drawings, draftDrawing, toolsEnabled]);
+  }, [drawings, draftDrawing, limitLines, toolsEnabled]);
 
   useEffect(() => {
     try {

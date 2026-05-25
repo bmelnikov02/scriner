@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"screiner-backend/binance"
+	"screiner-backend/bybit"
 	"screiner-backend/handlers"
 	"screiner-backend/ws"
 
@@ -35,6 +36,7 @@ func wsHandler(w http.ResponseWriter, r *http.Request) {
 func main() {
 	go binance.StartTicker()
 	go binance.StartKline()
+	go bybit.StartDepth()
 
 	http.HandleFunc("/symbols", handlers.Symbols)
 	http.HandleFunc("/timeframe", handlers.Timeframe)
