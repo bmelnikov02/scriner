@@ -685,7 +685,7 @@ export default function Home() {
   const [chartPageMotion, setChartPageMotion] =
     useState<ChartPageMotion>("idle");
   const [coinSortMode, setCoinSortMode] = useState<CoinSortMode>("volume");
-  const [siteStyle, setSiteStyle] = useState<SiteStyle>("light");
+  const [siteStyle, setSiteStyle] = useState<SiteStyle>("dark");
   const [workspaceLoaded, setWorkspaceLoaded] = useState(false);
   const [quickSearchText, setQuickSearchText] = useState("");
   const [quickSearchVisible, setQuickSearchVisible] = useState(false);
@@ -2169,18 +2169,18 @@ export default function Home() {
             color: "#111827",
           }
         : {
-            "--site-bg": "#000000",
-            "--site-panel": "#050505",
-            "--site-panel-strong": "#0b0b0b",
-            "--site-surface": "#080808",
-            "--site-border": "rgba(255, 255, 255, 0.12)",
-            "--site-muted": "rgba(255, 255, 255, 0.62)",
-            "--site-text": "#f5f5f5",
-            "--site-accent": "#f5f5f5",
-            "--site-accent-contrast": "#000000",
-            "--site-shadow": "0 14px 40px rgba(0, 0, 0, 0.38)",
-            backgroundColor: "#000000",
-            color: "#f5f5f5",
+            "--site-bg": "#020305",
+            "--site-panel": "#07090d",
+            "--site-panel-strong": "#0c1016",
+            "--site-surface": "#10151c",
+            "--site-border": "rgba(186, 154, 255, 0.16)",
+            "--site-muted": "rgba(228, 232, 240, 0.58)",
+            "--site-text": "#eef2f8",
+            "--site-accent": "#c7b4ff",
+            "--site-accent-contrast": "#050609",
+            "--site-shadow": "0 18px 44px rgba(0, 0, 0, 0.46)",
+            backgroundColor: "#020305",
+            color: "#eef2f8",
           },
     [siteStyle]
   );
@@ -3008,8 +3008,10 @@ export default function Home() {
           .site-shell[data-site-style="dark"] .main-toolbar-item.is-active,
           .site-shell[data-site-style="dark"] .main-timeframe-item.is-active,
           .site-shell[data-site-style="dark"] .main-grid-item.is-active {
-            background: linear-gradient(180deg, rgba(255,255,255,0.14), rgba(255,255,255,0.04)) !important;
-            color: #ffffff !important;
+            background: linear-gradient(180deg, rgba(199, 180, 255, 0.36), rgba(199, 180, 255, 0.18)) !important;
+            color: #f7f3ff !important;
+            border-color: rgba(199, 180, 255, 0.45) !important;
+            box-shadow: inset 0 1px 0 rgba(255,255,255,0.08), 0 8px 22px rgba(0,0,0,0.3) !important;
           }
 
           .site-shell[data-site-style="light"] .alert-panel {
@@ -3120,13 +3122,95 @@ export default function Home() {
           }
 
           .site-shell[data-site-style="dark"] {
-            background: #000 !important;
+            background: var(--site-bg) !important;
+          }
+
+          .site-shell[data-site-style="dark"] .app-shell-grid {
+            background: linear-gradient(180deg, #030407 0%, #000 100%) !important;
           }
 
           .site-shell[data-site-style="dark"] .chart-card,
           .site-shell[data-site-style="dark"] .coins-panel,
           .site-shell[data-site-style="dark"] .app-header {
-            background: #020202 !important;
+            background: linear-gradient(180deg, rgba(10, 13, 18, 0.98), rgba(4, 5, 8, 0.98)) !important;
+            border-color: rgba(186, 154, 255, 0.16) !important;
+            box-shadow: inset 0 1px 0 rgba(255,255,255,0.035), 0 18px 44px rgba(0,0,0,0.42) !important;
+          }
+
+          .site-shell[data-site-style="dark"] .app-header {
+            background: linear-gradient(180deg, rgba(9, 12, 17, 0.72), rgba(3, 4, 6, 0.34)) !important;
+            box-shadow: none !important;
+          }
+
+          .site-shell[data-site-style="dark"] .main-toolbar,
+          .site-shell[data-site-style="dark"] .main-timeframe-row,
+          .site-shell[data-site-style="dark"] .main-grid-row,
+          .site-shell[data-site-style="dark"] .coin-filter-tabs,
+          .site-shell[data-site-style="dark"] .coin-search {
+            background: rgba(5, 7, 11, 0.92) !important;
+            border-color: rgba(186, 154, 255, 0.15) !important;
+            box-shadow: inset 0 1px 0 rgba(255,255,255,0.035) !important;
+          }
+
+          .site-shell[data-site-style="dark"] .main-toolbar-item,
+          .site-shell[data-site-style="dark"] .main-timeframe-item,
+          .site-shell[data-site-style="dark"] .main-grid-item,
+          .site-shell[data-site-style="dark"] .coin-filter-button {
+            color: rgba(238, 242, 248, 0.82) !important;
+            border-color: rgba(186, 154, 255, 0.08) !important;
+          }
+
+          .site-shell[data-site-style="dark"] .main-toolbar-item:hover,
+          .site-shell[data-site-style="dark"] .main-timeframe-item:hover,
+          .site-shell[data-site-style="dark"] .main-grid-item:hover,
+          .site-shell[data-site-style="dark"] .coin-filter-button:hover,
+          .site-shell[data-site-style="dark"] .settings-button:hover {
+            background: rgba(199, 180, 255, 0.12) !important;
+            border-color: rgba(199, 180, 255, 0.3) !important;
+            color: #ffffff !important;
+          }
+
+          .site-shell[data-site-style="dark"] .coin-list-head {
+            background: rgba(13, 17, 23, 0.96) !important;
+            border-color: rgba(186, 154, 255, 0.15) !important;
+            color: rgba(228, 232, 240, 0.6) !important;
+          }
+
+          .site-shell[data-site-style="dark"] .coin-row {
+            background: rgba(7, 9, 13, 0.78) !important;
+            border-color: rgba(255,255,255,0.055) !important;
+          }
+
+          .site-shell[data-site-style="dark"] .coin-row:hover {
+            background: rgba(199, 180, 255, 0.08) !important;
+          }
+
+          .site-shell[data-site-style="dark"] .settings-popover.settings-designed,
+          .site-shell[data-site-style="dark"] .settings-sidebar,
+          .site-shell[data-site-style="dark"] .settings-main-panel,
+          .site-shell[data-site-style="dark"] .settings-link-card,
+          .site-shell[data-site-style="dark"] .settings-note,
+          .site-shell[data-site-style="dark"] .settings-field input,
+          .site-shell[data-site-style="dark"] .settings-choice,
+          .site-shell[data-site-style="dark"] .settings-add-button,
+          .site-shell[data-site-style="dark"] .settings-add-menu,
+          .site-shell[data-site-style="dark"] .alert-panel,
+          .site-shell[data-site-style="dark"] .alert-field-input,
+          .site-shell[data-site-style="dark"] .alert-note {
+            background: linear-gradient(180deg, rgba(12, 16, 22, 0.96), rgba(5, 7, 11, 0.96)) !important;
+            border-color: rgba(186, 154, 255, 0.16) !important;
+            color: var(--site-text) !important;
+          }
+
+          .site-shell[data-site-style="dark"] .settings-tab-button:hover,
+          .site-shell[data-site-style="dark"] .settings-tab-button.is-active,
+          .site-shell[data-site-style="dark"] .settings-choice:hover,
+          .site-shell[data-site-style="dark"] .settings-choice.is-active,
+          .site-shell[data-site-style="dark"] .settings-add-button:hover,
+          .site-shell[data-site-style="dark"] .site-style-option[class~="bg-[#c8b6dc]"] {
+            background: linear-gradient(180deg, rgba(199, 180, 255, 0.28), rgba(199, 180, 255, 0.14)) !important;
+            color: #ffffff !important;
+            border-color: rgba(199, 180, 255, 0.36) !important;
           }
 
           .site-shell[data-site-style="light"] .chart-card {
@@ -3139,8 +3223,10 @@ export default function Home() {
           }
 
           .site-shell[data-site-style="dark"] .chart-card button[title="Open fullscreen"] {
-            background: rgba(0,0,0,0.86) !important;
+            background: rgba(5, 7, 11, 0.88) !important;
+            border-color: rgba(199, 180, 255, 0.18) !important;
             color: #ffffff !important;
+            box-shadow: 0 10px 26px rgba(0,0,0,0.42) !important;
           }
 
           @media (max-width: 980px) {
