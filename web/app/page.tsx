@@ -1884,14 +1884,18 @@ export default function Home() {
     }
   }
 
+  function openFullscreenSymbol(symbol: string) {
+    setFullscreenSymbol(symbol);
+    setActiveView("overview");
+    setPageIndex(Math.max(0, Math.floor(Math.max(0, orderedSymbols.indexOf(symbol)) / gridCount)));
+  }
+
   function openAlertSymbol(symbol: string, toastTimeframe: string) {
     if (allTimeframes.includes(toastTimeframe)) {
       setTimeframe(toastTimeframe);
     }
 
-    setFullscreenSymbol(symbol);
-    setActiveView("overview");
-    setPageIndex(Math.max(0, Math.floor(Math.max(0, orderedSymbols.indexOf(symbol)) / gridCount)));
+    openFullscreenSymbol(symbol);
   }
 
   const chartHeight = "h-full min-h-0 flex-1";
@@ -4228,22 +4232,14 @@ export default function Home() {
                 >
                   <button
                     type="button"
-                    onClick={() => copySymbol(symbol)}
-                      className="min-w-0 border-r border-white/10 px-2 py-1.5 text-left transition hover:text-[#c8b6dc]"
-                    title="Copy symbol"
+                    onClick={() => openFullscreenSymbol(symbol)}
+                    className="min-w-0 border-r border-white/10 px-2 py-1.5 text-left transition hover:text-[#c8b6dc]"
+                    title="Open fullscreen"
                   >
-                    <span className="flex min-w-0 items-center gap-1">
-                        <span className="coin-row-symbol truncate text-xs font-semibold uppercase text-white">
+                    <span className="flex min-w-0 items-center">
+                      <span className="coin-row-symbol truncate text-xs font-semibold uppercase text-white">
                         {symbol}
                       </span>
-                      {isFavorite && (
-                        <span
-                          className="shrink-0 text-[0px] leading-none before:text-xs before:content-['*']"
-                          style={{ color: bookmarkColor }}
-                        >
-                          в…
-                        </span>
-                      )}
                     </span>
                   </button>
 
@@ -4270,6 +4266,11 @@ export default function Home() {
                         <path
                           d="M1 1H13V11.5L7 15L1 11.5Z"
                           className="bookmark-shield"
+                          style={{
+                            fill: isFavorite ? bookmarkColor : "transparent",
+                            fillOpacity: isFavorite ? 0.22 : 1,
+                            stroke: isFavorite ? bookmarkColor : undefined,
+                          }}
                           strokeWidth="1.3"
                           strokeLinejoin="round"
                           vectorEffect="non-scaling-stroke"
