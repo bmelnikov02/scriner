@@ -1851,6 +1851,85 @@ export default function CandleChart({
     redrawChart();
   }
 
+  function zoomChartWithWheel(event: React.WheelEvent<HTMLDivElement>) {
+    const chart = chartRef.current;
+    const xScale = chart?.scales.x;
+    const chartArea = chart?.chartArea;
+    const canvas = chart?.canvas;
+
+    if (
+      !chart ||
+      !xScale ||
+      !chartArea ||
+      !canvas ||
+      oldestScrollableTime === undefined ||
+      newestScrollableTime === undefined ||
+      newestScrollableTime <= oldestScrollableTime ||
+      candleSpacing <= 0
+    ) {
+      return;
+    }
+
+    const bounds = canvas.getBoundingClientRect();
+    const pixelX = event.clientX - bounds.left;
+    const pixelY = event.clientY - bounds.top;
+
+    if (
+      pixelX < chartArea.left ||
+      pixelX > chartArea.right ||
+      pixelY < chartArea.top ||
+      pixelY > chartArea.bottom
+    ) {
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+
+    const currentMin = Number(activeXRange?.min ?? xScale.min);
+    const currentMax = Number(activeXRange?.max ?? xScale.max);
+    const currentRange = currentMax - currentMin;
+    const scrollableRange = newestScrollableTime - oldestScrollableTime;
+
+    if (!Number.isFinite(currentRange) || currentRange <= 0) return;
+
+    const wheelFactor = Math.min(2.5, Math.max(0.4, Math.exp(event.deltaY * 0.0015)));
+    const minRange = candleSpacing * 10;
+    const nextRange = Math.min(
+      scrollableRange,
+      Math.max(minRange, currentRange * wheelFactor)
+    );
+    const cursorValue = Number(xScale.getValueForPixel(pixelX));
+    const center = Number.isFinite(cursorValue)
+      ? cursorValue
+      : currentMin + currentRange / 2;
+    const cursorRatio = Math.min(
+      0.95,
+      Math.max(0.05, (center - currentMin) / currentRange)
+    );
+    const unclampedRange = {
+      symbol,
+      timeframe,
+      min: center - nextRange * cursorRatio,
+      max: center + nextRange * (1 - cursorRatio),
+    };
+    const nextXRange = clampXRangeToCandles(unclampedRange) ?? unclampedRange;
+
+    setHoverXRange(null);
+    setXRange(nextXRange);
+    requestOlderCandlesIfNeeded(nextXRange.min);
+
+    const xOptions = chart.options.scales?.x;
+
+    if (xOptions) {
+      xOptions.min = nextXRange.min;
+      xOptions.max = nextXRange.max;
+      chart.update("none");
+    } else {
+      redrawChart();
+    }
+  }
+
   function getDrawingTargetFromClient(
     clientX: number,
     clientY: number
@@ -2484,7 +2563,7 @@ export default function CandleChart({
         </div>
       )}
 
-      <div className="relative min-h-0 flex-1">
+      <div className="relative min-h-0 flex-1" onWheel={zoomChartWithWheel}>
       {toolsEnabled && (
         <div
           className={`absolute left-0 top-0 z-[70] flex max-w-[calc(100%-48px)] items-start gap-1 rounded-br-md border-b border-r p-1 shadow-sm backdrop-blur ${
