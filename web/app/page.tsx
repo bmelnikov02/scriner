@@ -128,6 +128,7 @@ type SavedWorkspace = {
   customTimeframes?: string[];
   alertThresholdPercent?: number;
   alertWindowMinutes?: number;
+  densityMinNotional?: number;
 };
 
 type WsMessage =
@@ -166,6 +167,8 @@ const ALERT_COOLDOWN_MS = 45_000;
 const ALERT_SOUND_SRC = "/sounds/sound-messages-odnoklassniki.mp3";
 const DEFAULT_ALERT_THRESHOLD_PERCENT = 5;
 const DEFAULT_ALERT_WINDOW_MINUTES = 1;
+const DEFAULT_DENSITY_MIN_NOTIONAL = 100_000;
+const DENSITY_NOTIONAL_PRESETS = [25_000, 50_000, 100_000, 250_000, 500_000, 1_000_000];
 const GRID_CANDLE_LIMIT = 350;
 const FULLSCREEN_CANDLE_LIMIT = 1000;
 const OLDER_CANDLE_LIMIT = 500;
@@ -474,6 +477,12 @@ function formatVolume(value?: number) {
   return `$${value.toFixed(0)}`;
 }
 
+function normalizeDensityMinNotional(value: number) {
+  if (!Number.isFinite(value)) return DEFAULT_DENSITY_MIN_NOTIONAL;
+
+  return Math.min(10_000_000, Math.max(1_000, Math.round(value)));
+}
+
 function extractTickers(payload: unknown): BinanceTicker[] {
   if (Array.isArray(payload)) return payload as BinanceTicker[];
 
@@ -675,6 +684,9 @@ export default function Home() {
   );
   const [alertWindowMinutes, setAlertWindowMinutes] = useState(
     DEFAULT_ALERT_WINDOW_MINUTES
+  );
+  const [densityMinNotional, setDensityMinNotional] = useState(
+    DEFAULT_DENSITY_MIN_NOTIONAL
   );
   const [alertToasts, setAlertToasts] = useState<AlertToast[]>([]);
   const [drawingsByChart, setDrawingsByChart] = useState<DrawingsByChart>({});
@@ -989,6 +1001,15 @@ export default function Home() {
           setAlertWindowMinutes(saved.alertWindowMinutes);
         }
 
+        if (
+          typeof saved.densityMinNotional === "number" &&
+          saved.densityMinNotional > 0
+        ) {
+          setDensityMinNotional(
+            normalizeDensityMinNotional(saved.densityMinNotional)
+          );
+        }
+
       if (typeof saved.alertsEnabled === "boolean") {
         setAlertsEnabled(saved.alertsEnabled);
       }
@@ -1022,6 +1043,7 @@ export default function Home() {
       customTimeframes,
       alertThresholdPercent,
       alertWindowMinutes,
+      densityMinNotional,
     };
 
     try {
@@ -1039,6 +1061,7 @@ export default function Home() {
     alertsEnabled,
     coinSortMode,
     customTimeframes,
+    densityMinNotional,
     drawingsByChart,
     favoriteColors,
     favorites,
@@ -2185,11 +2208,43 @@ export default function Home() {
       return (
         <div className="settings-tab-content">
           <h3>DENSITY</h3>
+          <div className="settings-note">
+            Strong density lines show only order book levels above {formatVolume(densityMinNotional)}.
+          </div>
+          <div className="settings-control-grid">
+            {DENSITY_NOTIONAL_PRESETS.map((value) => (
+              <button
+                key={value}
+                type="button"
+                onClick={() => setDensityMinNotional(value)}
+                className={`settings-choice ${
+                  densityMinNotional === value ? "is-active" : ""
+                }`}
+              >
+                {formatVolume(value)}
+              </button>
+            ))}
+          </div>
+          <label className="settings-field">
+            <span>Min amount, $</span>
+            <input
+              type="number"
+              min="1000"
+              max="10000000"
+              step="1000"
+              value={densityMinNotional}
+              onChange={(event) =>
+                setDensityMinNotional(
+                  normalizeDensityMinNotional(Number(event.target.value))
+                )
+              }
+            />
+          </label>
           <div className="settings-link-card">
             <span className="settings-card-icon">
               <SettingsTabIcon id="density" />
             </span>
-            <span>Compact trading layout</span>
+            <span>Bid lines stay green, ask lines stay red</span>
           </div>
         </div>
       );
@@ -3286,6 +3341,65 @@ export default function Home() {
             box-shadow: 0 10px 26px rgba(0,0,0,0.42) !important;
           }
 
+          @media (max-width: 760px) {
+            .settings-popover.settings-designed {
+              grid-template-columns: minmax(0, 1fr) !important;
+              align-content: start;
+              overflow-y: auto !important;
+              gap: 10px !important;
+              padding: 10px !important;
+            }
+
+            .settings-sidebar,
+            .settings-main-panel {
+              min-width: 0;
+              padding: 12px !important;
+            }
+
+            .settings-tab-list {
+              display: grid !important;
+              grid-template-columns: repeat(2, minmax(0, 1fr));
+              gap: 6px;
+            }
+
+            .settings-tab-button {
+              min-height: 44px !important;
+              gap: 8px !important;
+              border-bottom: 0 !important;
+              padding: 0 10px !important;
+              font-size: 12px !important;
+            }
+
+            .settings-logo-orb {
+              display: none !important;
+            }
+
+            .settings-tab-content {
+              max-width: none !important;
+            }
+
+            .settings-tab-content h3 {
+              font-size: 26px !important;
+            }
+
+            .settings-link-card {
+              min-height: 58px !important;
+              padding: 0 14px !important;
+              font-size: 14px !important;
+            }
+
+            .settings-control-grid {
+              grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+              gap: 8px !important;
+            }
+
+            .settings-choice {
+              min-height: 44px !important;
+              padding: 0 10px !important;
+              font-size: 13px !important;
+            }
+          }
+
           @media (max-width: 980px) {
             .header-brand {
               display: none;
@@ -3912,8 +4026,24 @@ export default function Home() {
                         <div className="text-xs font-black uppercase tracking-[0.12em] text-white/45">
                           Density
                         </div>
-                        <div className="rounded-md border border-white/10 bg-black/20 px-3 py-2">
-                          Compact trading layout
+                        <div className="grid grid-cols-2 gap-2">
+                          {DENSITY_NOTIONAL_PRESETS.map((value) => (
+                            <button
+                              key={value}
+                              type="button"
+                              onClick={() => setDensityMinNotional(value)}
+                              className={`rounded-md border px-3 py-2 text-sm font-black transition ${
+                                densityMinNotional === value
+                                  ? "border-[#c8b6dc]/70 bg-[#c8b6dc] text-black"
+                                  : "border-white/10 bg-black/20 text-white/70 hover:bg-white/[0.08] hover:text-white"
+                              }`}
+                            >
+                              {formatVolume(value)}
+                            </button>
+                          ))}
+                        </div>
+                        <div className="rounded-md border border-white/10 bg-black/20 px-3 py-2 text-xs font-semibold text-white/58">
+                          Strong density lines from {formatVolume(densityMinNotional)}
                         </div>
                       </div>
                     )}
@@ -3986,7 +4116,6 @@ export default function Home() {
               const drawingKey = getDrawingKey(symbol, timeframe);
               const densityLineCount =
                 visibleSymbols.length >= 5 ? 2 : visibleSymbols.length >= 3 ? 3 : 4;
-              const densityMinNotional = visibleSymbols.length >= 5 ? 25_000 : 15_000;
               const limitLines = depthOpen
                 ? getDepthLimitLines(
                     depth[symbol],
@@ -4435,7 +4564,7 @@ export default function Home() {
                 EMPTY_DRAWINGS
               }
               limitLines={
-                depthOpen ? getDepthLimitLines(depth[fullscreenSymbol], 6, 10_000) : []
+                depthOpen ? getDepthLimitLines(depth[fullscreenSymbol], 6, densityMinNotional) : []
               }
               onDrawingsChange={(nextDrawings) =>
                 updateChartDrawings(fullscreenSymbol, nextDrawings)
