@@ -1530,6 +1530,11 @@ export default function Home() {
 
       if (event.key === "ArrowLeft") {
         event.preventDefault();
+        if (fullscreenSymbol) {
+          navigateFullscreenSymbol(-1);
+          return;
+        }
+
         if (gridOpen) {
           changeGridCount(gridCount - 1);
           return;
@@ -1541,6 +1546,11 @@ export default function Home() {
 
       if (event.key === "ArrowRight") {
         event.preventDefault();
+        if (fullscreenSymbol) {
+          navigateFullscreenSymbol(1);
+          return;
+        }
+
         if (gridOpen) {
           changeGridCount(gridCount + 1);
           return;
@@ -1555,6 +1565,7 @@ export default function Home() {
     return () => window.removeEventListener("keydown", handleKeyboard);
   }, [
     alertSettingsOpen,
+    chartSymbols,
     closeFloatingMenus,
     favoriteMenuOpen,
     fullscreenSymbol,
@@ -1564,6 +1575,7 @@ export default function Home() {
     pageCount,
     quickSearchText,
     quickSearchVisible,
+    orderedSymbols,
     safePageIndex,
     settingsOpen,
     timeframe,
@@ -1890,6 +1902,26 @@ export default function Home() {
     setPageIndex(Math.max(0, Math.floor(Math.max(0, orderedSymbols.indexOf(symbol)) / gridCount)));
   }
 
+  function navigateFullscreenSymbol(direction: -1 | 1) {
+    const list = chartSymbols.length > 0 ? chartSymbols : orderedSymbols;
+
+    if (!fullscreenSymbol || list.length === 0) return;
+
+    const currentIndex = list.indexOf(fullscreenSymbol);
+    const nextIndex =
+      currentIndex >= 0
+        ? (currentIndex + direction + list.length) % list.length
+        : direction > 0
+          ? 0
+          : list.length - 1;
+    const nextSymbol = list[nextIndex];
+
+    if (!nextSymbol) return;
+
+    setFullscreenSymbol(nextSymbol);
+    setPageIndex(Math.max(0, Math.floor(Math.max(0, orderedSymbols.indexOf(nextSymbol)) / gridCount)));
+  }
+
   function openAlertSymbol(symbol: string, toastTimeframe: string) {
     if (allTimeframes.includes(toastTimeframe)) {
       setTimeframe(toastTimeframe);
@@ -1913,6 +1945,27 @@ export default function Home() {
   const chartColumnCount = depthOpen
     ? getDepthChartColumnCount(visibleSymbols.length)
     : getChartColumnCount(visibleSymbols.length);
+  const fullscreenList = chartSymbols.length > 0 ? chartSymbols : orderedSymbols;
+  const fullscreenIndex = fullscreenSymbol
+    ? fullscreenList.indexOf(fullscreenSymbol)
+    : -1;
+  const fullscreenPrevSymbol =
+    fullscreenSymbol && fullscreenList.length > 0
+      ? fullscreenList[
+          fullscreenIndex >= 0
+            ? (fullscreenIndex - 1 + fullscreenList.length) % fullscreenList.length
+            : fullscreenList.length - 1
+        ]
+      : null;
+  const fullscreenNextSymbol =
+    fullscreenSymbol && fullscreenList.length > 0
+      ? fullscreenList[
+          fullscreenIndex >= 0
+            ? (fullscreenIndex + 1) % fullscreenList.length
+            : 0
+        ]
+      : null;
+  const canNavigateFullscreen = fullscreenList.length > 1;
   const bottomRowCount = visibleSymbols.length % chartColumnCount;
   const lastChartColumnSpan =
     visibleSymbols.length > 1 && bottomRowCount > 0
@@ -4321,14 +4374,34 @@ export default function Home() {
       {fullscreenSymbol && (
         <div className="fixed inset-0 z-50 flex flex-col overflow-hidden bg-[#05090c] p-4">
           <div className="mb-3 flex shrink-0 items-center justify-between rounded-lg border border-white/10 bg-[#080d11] px-4 py-3">
-            <div>
-              <h2 className="text-2xl font-black text-[#c8b6dc]">
+            <div className="min-w-0">
+              <h2 className="truncate text-2xl font-black text-[#c8b6dc]">
                 {fullscreenSymbol} {timeframe}
               </h2>
               <p className="text-sm text-white/45">Candlestick chart</p>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex shrink-0 items-center gap-2">
+              <button
+                type="button"
+                onClick={() => navigateFullscreenSymbol(-1)}
+                disabled={!canNavigateFullscreen}
+                className="grid size-10 place-items-center rounded-lg border border-white/10 text-xl font-black text-white/70 transition hover:bg-white/[0.06] hover:text-[#c8b6dc] disabled:cursor-not-allowed disabled:opacity-35"
+                aria-label="Previous coin"
+                title={fullscreenPrevSymbol ? `Previous ${fullscreenPrevSymbol}` : "Previous coin"}
+              >
+                &larr;
+              </button>
+              <button
+                type="button"
+                onClick={() => navigateFullscreenSymbol(1)}
+                disabled={!canNavigateFullscreen}
+                className="grid size-10 place-items-center rounded-lg border border-white/10 text-xl font-black text-white/70 transition hover:bg-white/[0.06] hover:text-[#c8b6dc] disabled:cursor-not-allowed disabled:opacity-35"
+                aria-label="Next coin"
+                title={fullscreenNextSymbol ? `Next ${fullscreenNextSymbol}` : "Next coin"}
+              >
+                &rarr;
+              </button>
               <button
                 onClick={() => setFullscreenSymbol(null)}
                 className="grid size-10 place-items-center rounded-lg border border-white/10 text-xl font-black text-white/70 hover:bg-white/[0.06]"
